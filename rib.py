@@ -88,6 +88,8 @@ def rib_todo_quadro(l, jogo):
     elif agora < x.get("recarga_ate", 0):
         texto = "RECARREGANDO"
     x["municao"] = (SHURIKENS - len(x["tiros"]) if not texto else 0, SHURIKENS, texto)
+    import habilidades
+    habilidades.sapo_quadro(l, jogo)  # SAPO NINJA: pulo alto, pulo duplo e a substituição
 
 
 def tem_shuriken(l):
@@ -327,8 +329,24 @@ def ultimate_efeito(l, tela):
         brilho(tela, (int(mx), int(my)), int((10 + 3 * l.t) * l.s), (150, 220, 255), 160)
 
 
+def desenhar_clone_bunshin(l, tela, branco):
+    """O clone do KAGE BUNSHIN (R): do outro lado do adversário, virado pro Rib."""
+    c = l.memo.get("clone") if l.estado == "ataque" and l.nome_golpe == "rib_bunshin" else None
+    if not c or getattr(l, "_clone", False):
+        return
+    guarda = (l.x, l.dir, l.vira)
+    l._clone = True
+    try:
+        l.x, l.dir, l.vira = c["x"] * l.s / c["s"], c["dir"], False  # (x do mundo -> escala do desenho)
+        desenhar_rib(l, tela, POSES_RIB[c["pose"]], branco)
+    finally:
+        l.x, l.dir, l.vira = guarda
+        l._clone = False
+
+
 def desenhar_clones(l, tela, branco):
     """Os clones (o mesmo desenho do Rib), atrás dele."""
+    desenhar_clone_bunshin(l, tela, branco)
     clones = l.memo.get("clones") if l.estado == "ataque" and l.nome_golpe == "rib_ultimate" else None
     if not clones or getattr(l, "_clone", False):
         return
@@ -342,6 +360,164 @@ def desenhar_clones(l, tela, branco):
     finally:
         l.x, l.y = guarda
         l._clone = False
+
+
+# =====================================================================
+# R (v2.x, pedido do Gomes): KAGE BUNSHIN — corre, e quando encosta aparece um CLONE do outro lado:
+# os dois batem juntos, 10 hits de 2 (o último derruba). Errou (ou defenderam o 1º): acaba.
+# =====================================================================
+B_SAI, B_CORRE_ATE, B_HITS, B_INTERVALO = 6, 34, 10, 5
+
+
+def bunshin(l, outro, jogo):
+    t = l.t
+    m = l.memo
+    if t == 1:
+        m["hits"], m["antes"], m["clone"] = 0, False, None
+    if l.acertou and not m["antes"]:  # um hit entrou agora
+        if outro.estado == "defendendo" and not m["hits"]:
+            m["parou"] = t  # defendeu o 1º: não tem clone
+        else:
+            m["hits"] += 1
+            if m["hits"] == 1:  # KAGE BUNSHIN! o clone aparece do outro lado
+                som.tocar("puf")
+                lado = 1 if outro.x > l.x else -1
+                m["clone"] = dict(x=outro.x + lado * 58 * l.s, dir=-lado, pose="r_soco_a", s=l.s)
+                m["tela_toda"] = True  # (o clone fica longe dele: desenha a tela toda)
+                fumaca(jogo, m["clone"]["x"], l.y - 60 * l.s, 8, (220, 226, 236), 4, -1)
+                m["prox"] = t + B_INTERVALO
+                m["quadros"] = [(0, "parado"), (t - 1, "r_corre1")] + [
+                    (t + k * B_INTERVALO, "r_soco_a" if k % 2 == 0 else "r_soco_b") for k in range(B_HITS + 1)] + [
+                    (t + B_HITS * B_INTERVALO + 16, "parado")]
+            if m["hits"] >= B_HITS:
+                m["parou"] = t
+    m["antes"] = l.acertou
+    if m["hits"] and "parou" not in m and t >= m.get("prox", 0):  # o próximo hit (alterna: Rib, clone, Rib...)
+        l.acertou = m["antes"] = False
+        m["prox"] = t + B_INTERVALO
+    m["g_hit"] = GOLPES["rib_bunshin_final"] if m["hits"] == B_HITS - 1 else GOLPES["rib_bunshin"]
+    c = m.get("clone")
+    if c:
+        c["pose"] = "r_soco_b" if m["hits"] % 2 else "r_soco_a"
+    if "parou" in m:
+        m["caixa"] = None
+        l.vx *= 0.7
+        if t - m["parou"] == 14 and c:  # o clone some
+            som.tocar("puf", 0.6)
+            fumaca(jogo, c["x"], l.y - 60 * l.s, 8, (220, 226, 236), 4, -1)
+            m["clone"] = None
+        if t - m["parou"] > 18:
+            return "fim"
+    elif t < B_SAI:
+        l.vx = 0
+    elif m["hits"]:
+        l.vx = 0
+        m["caixa"] = (0, 20, 90, 120)  # (já está colado: a caixa pega o outro com folga)
+        if outro.estado == "golpeado":
+            outro.stun = max(outro.stun, B_INTERVALO + 4)  # (os hits emendam: não escapa no meio)
+            outro.vx = 0
+    elif t < B_CORRE_ATE:
+        l.vx = 11 * l.dir
+        m["caixa"] = (0, 30, 50, 110)
+        if t % 3 == 0:
+            fumaca(jogo, l.x - 18 * l.dir, CHAO - 4, 1, (170, 150, 130), 1, -0.3)
+    else:
+        m["parou"] = t
+    l.fisica(jogo)
+
+
+def bunshin_quadros():
+    q = [(0, "parado"), (B_SAI - 2, "r_corre1")]
+    for k in range(1, 9):
+        q.append((B_SAI - 2 + k * 4, "r_corre2" if k % 2 else "r_corre1"))
+    t0 = B_CORRE_ATE
+    for k in range(B_HITS + 2):
+        q.append((t0 + k * B_INTERVALO, "r_soco_a" if k % 2 == 0 else "r_soco_b"))
+    return q
+
+
+# =====================================================================
+# SHIFT (v2.x, pedido do Gomes): KUNAI COM CORRENTE — joga a kunai; se fisgar, o Rib SE PUXA até o outro
+# pela corrente e chega com uma VOADORA. (A linguada antiga continua existindo pro Ribbat.)
+# =====================================================================
+K_JOGA, K_VEL, K_ALCANCE, K_VOLTA = 8, 22, 380, 12
+
+
+def kunai(l, outro, jogo):
+    t = l.t
+    m = l.memo
+    if t == 1:
+        m.update(fase="joga", ext=0.0)
+        som.tocar("vento", 0.5)
+    m["g_hit"] = GOLPES["rib_kunai_voadora"] if m["fase"] == "voadora" else GOLPES["rib_kunai"]
+    mao = l.ponto(l.pose_vista or l.pose_atual(), "mf")
+    altura = (l.y - mao[1]) / l.s
+    if m["fase"] == "joga":
+        l.vx = 0
+        if t >= K_JOGA:
+            m["ext"] = min(K_ALCANCE, m["ext"] + K_VEL)
+            m["caixa"] = (m["ext"] - 14, altura - 12, m["ext"] + 12, altura + 12)
+            if l.acertou:  # FISGOU!
+                if outro.estado == "defendendo":
+                    m["fase"], m["volta_t"] = "volta", t
+                else:
+                    m["fase"] = "puxa"
+                    m["quadros"] = [(0, "parado"), (t, "r_arremesso"), (t + 4, "r_corre1"), (t + 400, "r_corre1")]
+                    som.tocar("defesa", 0.6)
+                    l.vy = -4
+            elif m["ext"] >= K_ALCANCE:
+                m["fase"], m["volta_t"] = "volta", t
+    elif m["fase"] == "puxa":  # vai voando pela corrente
+        m["caixa"] = None
+        alvo = outro.x - l.dir * 52 * l.s
+        l.vx = max(-20, min(20, (alvo - l.x) * 0.45))
+        if l.y > outro.y - 40 * l.s:
+            l.vy = min(l.vy, -1.0)
+        outro.stun = max(outro.stun, 12)
+        m["ext"] = max(0, abs(outro.x - l.x) / l.s - 20)
+        if abs(alvo - l.x) < 18 or t > 70:
+            m["fase"], m["chute_t"] = "voadora", t
+            m["quadros"] = [(0, "parado"), (t, "r_corre1"), (t + 3, "r_chute_ult"), (t + 16, "r_chute_ult"),
+                            (t + 30, "parado")]
+            l.acertou = False
+            l.vx = 7 * l.dir
+    elif m["fase"] == "voadora":
+        m["ext"] = 0
+        m["caixa"] = (10, 40, 92, 100) if t - m["chute_t"] < 10 else None
+        if (t - m["chute_t"] > 22 and l.no_chao()) or t - m["chute_t"] > 40:
+            return "fim"
+    else:  # volta (errou ou defenderam)
+        m["caixa"] = None
+        l.vx = 0
+        m["ext"] = max(0, m["ext"] - K_VEL * 1.5)
+        if m["ext"] <= 0 and t - m["volta_t"] > K_VOLTA:
+            return "fim"
+    l.fisica(jogo)
+
+
+def kunai_quadros():
+    return [(0, "parado"), (3, "r_arma"), (K_JOGA, "r_arremesso"), (K_JOGA + 200, "r_arremesso")]
+
+
+def kunai_efeito(l, tela):
+    m = l.memo
+    ext = m.get("ext", 0)
+    if ext <= 0:
+        return
+    mao = l.ponto(l.pose_vista or l.pose_atual(), "mf")
+    fim = (mao[0] + ext * l.s * l.dir, mao[1] + (6 * l.s if m.get("fase") == "puxa" else 0))
+    n = max(2, int(ext / 9))
+    for i in range(n):  # a corrente: elos alternando
+        a = (mao[0] + (fim[0] - mao[0]) * i / n, mao[1] + (fim[1] - mao[1]) * i / n)
+        b = (mao[0] + (fim[0] - mao[0]) * (i + 1) / n, mao[1] + (fim[1] - mao[1]) * (i + 1) / n)
+        pygame.draw.line(tela, (30, 30, 36), a, b, max(3, int(3.4 * l.s)))
+        pygame.draw.line(tela, (170, 176, 188) if i % 2 else (120, 126, 138), a, b, max(1, int(1.8 * l.s)))
+    d, s = l.dir, l.s
+    ponta = [(fim[0] + 16 * s * d, fim[1]), (fim[0] + 2 * s * d, fim[1] - 5 * s), (fim[0] - 4 * s * d, fim[1]),
+             (fim[0] + 2 * s * d, fim[1] + 5 * s)]
+    pygame.draw.polygon(tela, (30, 30, 36), ponta)
+    pygame.draw.polygon(tela, (210, 216, 228), [(x * 0.85 + fim[0] * 0.15, y * 0.85 + fim[1] * 0.15) for x, y in ponta])
+    pygame.draw.circle(tela, (30, 30, 36), (int(fim[0] - 6 * s * d), int(fim[1])), max(2, int(3 * s)), max(1, int(s)))
 
 
 # =====================================================================
@@ -384,7 +560,14 @@ GOLPES["rib_ultimate"]["total"] = U_FIM + 1
 # o chute pra cima conta como "jogar pra cima" (dá pra pular atrás e fazer combo aéreo)
 GOLPES["rib_rasteira"]["lanca_depois"] = True
 
-GOLPES_RIB = {"E": "rib_shuriken", "R": "rib_corrida", "Q": "rib_rasteira", "SHIFT": "rib_lingua", "Z": "rib_ultimate"}
+_registra("rib_bunshin", som="vento", ini=B_SAI, ativo=250, rec=0, caixa=(0, 30, 50, 110), dano=2, hit=10, defe=8,
+          emp=0.3, nivel="medio", logica=bunshin, ia="medio", quadros=bunshin_quadros())
+GOLPES["rib_bunshin_final"] = dict(GOLPES["rib_bunshin"], derruba=True, voo=(8, 9), emp=8)
+_registra("rib_kunai", pose="r_arremesso", ini=K_JOGA, ativo=250, rec=0, caixa=None, dano=4, hit=26, defe=10, emp=0,
+          nivel="medio", logica=kunai, efeito=kunai_efeito, ia="longe", quadros=kunai_quadros())
+GOLPES["rib_kunai_voadora"] = dict(GOLPES["rib_kunai"], dano=12, hit=20, defe=14, emp=7, derruba=True, voo=(9, 9))
+
+GOLPES_RIB = {"E": "rib_shuriken", "R": "rib_bunshin", "Q": "rib_rasteira", "SHIFT": "rib_kunai", "Z": "rib_ultimate"}
 
 # =====================================================================
 # Desenho em pixel art
@@ -405,10 +588,10 @@ TRONCO = Peca([
     "..kxXXXxxxxk..",
     ".kxxXxxxxxxxk.",
     ".kGGggxxcccdk.",
-    ".kGgggggcccdk.",
+    ".kGgDgggcccdk.",
     ".kGgggggccCdk.",
-    ".kgggggccccdk.",
-    ".kgggggccccdk.",
+    ".kggggGccccdk.",
+    ".kgDgggccccdk.",
     ".kggggdcccCdk.",
     "..kgggdcccdk..",
     "..kgggdccCdk..",
@@ -433,11 +616,11 @@ TRONCO_COSTAS = Peca([
     ".kxxXxxxxxxxk.",
     ".kGGgggxxgddk.",
     ".kGggggggggdk.",
-    ".kGggggdgggdk.",
-    ".kgggggggggdk.",
+    ".kGggDgdgggdk.",
+    ".kgggggggGgdk.",
     ".kggdgggggddk.",
-    ".kggggggdggdk.",
-    "..kgggggggdk..",
+    ".kgDggggdggdk.",
+    "..kgggggDgdk..",
     "..kggdgggddk..",
     "..kggggggddk..",
     "..kgddDdddDk..",
@@ -455,69 +638,75 @@ TRONCO_COSTAS = Peca([
 ], PALETA, a=(7, 20), b=(7, 1))
 
 CABECA = Peca([
-    "..kkk..kkkkk..",
-    ".kyyyk.kyYYyk.",
-    ".kypyk.kyYpyk.",
-    "kkyykkkkyypyk.",
-    "kGkkGGggkkkk..",
-    "kGGggggggggGk.",
-    "kGgggggggggggk",
-    "kgggggggggggdk",
-    "kkkkkkkkkkkkkk",
-    "kgccccccccccdk",
-    ".kdddcccccddk.",
-    "..kkxxxxxxkk..",
-    "...kxXXxxk....",
-], PALETA, a=(6, 6), b=(6, 0), estica=False)
+    "...kkk..kkkkk...",
+    "..kyyyk.kyYYyk..",
+    "..kypyk.kyYpyk..",
+    ".kkyykkkkyypyk..",
+    ".kGkkGGggkkkk...",
+    ".kGGgggDggggGk..",
+    ".kGgggggggggggk.",
+    "kkkNNNNNNNNNNNk.",
+    "nnknnnnnNnnnnnk.",
+    ".nknnnnnnnnnnnk.",
+    "..knnnnnnnnnnnk.",
+    "..knnnnnnnnnnnnk",
+    "..knnnNnnnnnnnk.",
+    "...knnnnnnnNnk..",
+    "...kkkxxxxxxkk..",
+    "....kxXXxxk.....",
+], PALETA, a=(7, 6), b=(7, 0), estica=False)
 
 CABECA_COSTAS = Peca([
-    "..kkk..kkkkk..",
-    ".kgGgk.kgGGgk.",
-    ".kgggk.kgggdk.",
-    "kkgdkkkkggdk..",
-    "kGkkGGggkkkk..",
-    "kGGggggggggGk.",
-    "kGgggggggggggk",
-    "kgggggggggggdk",
-    "kgggggggggggdk",
-    "kggggggggggddk",
-    ".kdddddddddk..",
-    "..kkxxxxxxkk..",
-    "...kxXXxxk....",
-], PALETA, a=(6, 6), b=(6, 0), estica=False)
+    "...kkk..kkkkk...",
+    "..kgGgk.kgGGgk..",
+    "..kgggk.kgggdk..",
+    ".kkgdkkkkggdk...",
+    ".kGkkGGggkkkk...",
+    ".kGGggggDgggGk..",
+    ".kGgggggggggggk.",
+    "kkkNNNNNNNNNNNk.",
+    "nnknnnnnnnnnnnk.",
+    ".nknnnnnnnnnnnk.",
+    "..kgggggggggddk.",
+    "..kggggggggggdk.",
+    "..kdddddddddk...",
+    "...kkkxxxxxxkk..",
+    "....kxXXxxk.....",
+    "................",
+], PALETA, a=(7, 6), b=(7, 0), estica=False)
 
 COXA = Peca([
-    ".kkkkkk.",
-    "kGGgggdk",
-    "kGggggdk",
-    "kGggggdk",
-    "kGggggdk",
-    "kgggggdk",
-    "kggggddk",
-    "kggggddk",
-    "kgggdddk",
-    ".kgddDk.",
-    ".kgddDk.",
-    ".kdddDk.",
-    "..kddk..",
-    "..kkkk..",
+    ".kkkkkk..",
+    "kGGgggdk.",
+    "kGgggggdk",
+    "kGgggggdk",
+    "kGggDggdk",
+    "kgggggddk",
+    "kgggggddk",
+    "kggggdddk",
+    ".kgggddk.",
+    ".kgggddk.",
+    ".kgddDk..",
+    "..kddDk..",
+    "..kddk...",
+    "..kkkk...",
 ], PALETA, a=(3, 0), b=(3, 13))
 
 CANELA = Peca([
-    ".kkkkk.",
-    "kGgggdk",
-    "kgggddk",
-    "kbBbBbk",
-    "kBbBbBk",
-    "kbBbBbk",
-    "kBbBbBk",
-    "kbBbBbk",
-    "kBbBbBk",
-    ".kbBbk.",
-    ".kBbBk.",
-    ".kgddk.",
-    "..kdk..",
-    "..kkk..",
+    ".kkkkk..",
+    "kGgggdk.",
+    "kggggddk",
+    "kbBbBbBk",
+    "kBbBbBbk",
+    "kbBbBbBk",
+    "kBbBbBk.",
+    "kbBbBbk.",
+    "kBbBbBk.",
+    ".kbBbk..",
+    ".kBbBk..",
+    ".kgddk..",
+    "..kdk...",
+    "..kkk...",
 ], PALETA, a=(3, 0), b=(3, 13))
 
 PE = Peca([
@@ -533,7 +722,7 @@ BRACO = Peca([
     ".kkk.",
     "kGgdk",
     "kGgdk",
-    "kGgdk",
+    "kGDdk",
     "kggdk",
     "kggdk",
     "kggdk",
@@ -578,12 +767,43 @@ def _cachecol(l, tela, pescoco, d, esc, branco):
     import pecas
     troca = pecas.TROCA or {}  # (roupa ou personagem que usa o desenho do Rib, tipo o Ribbat: o cachecol vira lenço)
     cor = (240, 240, 245) if branco else troca.get("x", PALETA["x"])
-    pygame.draw.lines(tela, troca.get("k", PALETA["k"]), False, pts, max(3, int(4 * esc)))
-    pygame.draw.lines(tela, cor, False, pts, max(1, int(2.4 * esc)))
+    k = troca.get("k", PALETA["k"])
+    pygame.draw.lines(tela, k, False, pts[:7], max(3, int(4 * esc)))
+    pygame.draw.lines(tela, cor, False, pts[:7], max(1, int(2.4 * esc)))
     pygame.draw.line(tela, (240, 240, 245) if branco else troca.get("X", PALETA["X"]), pts[1], pts[3], 1)
+    # a ponta RASGADA: abre em 3 tirinhas finas de tamanhos diferentes
+    base = pts[6]
+    for j, (comp, abre) in enumerate(((3.4, -3.6), (5.0, 0.3), (2.6, 3.4))):
+        onda = math.sin(l.t * 0.3 - j * 1.3) * 0.9 * vel * esc
+        tira = [base, (base[0] - d * comp * 0.5 * 3 * esc, base[1] + abre * esc * 0.6 + onda * 0.5),
+                (base[0] - d * comp * 3 * esc, base[1] + abre * esc + onda)]
+        pygame.draw.lines(tela, k, False, tira, max(2, int(2.6 * esc)))
+        pygame.draw.lines(tela, cor, False, tira, max(1, int(1.2 * esc)))
+
+
+def tronco(tela, x, y, s, k):
+    """O TRONCO da SUBSTITUIÇÃO: aparece no lugar do Rib, tomba e some (k = 1 -> 0)."""
+    ang = (1 - k) * 1.2
+    w, h = 22 * s, 64 * s
+    sup = pygame.Surface((int(w) + 4, int(h) + 4), pygame.SRCALPHA)
+    pygame.draw.rect(sup, (26, 18, 10), (0, 0, int(w) + 4, int(h) + 4), border_radius=int(6 * s))
+    pygame.draw.rect(sup, (130, 86, 44), (2, 2, int(w), int(h)), border_radius=int(5 * s))
+    for i in range(3):  # a casca
+        xx = 2 + int(w * (0.25 + i * 0.25))
+        pygame.draw.line(sup, (92, 58, 28), (xx, 4), (xx, int(h) - 2), max(1, int(s)))
+    pygame.draw.ellipse(sup, (214, 170, 110), (2, 2, int(w), int(8 * s)))  # o corte em cima
+    pygame.draw.ellipse(sup, (160, 116, 66), (2 + int(w * 0.3), 2 + int(2 * s), int(w * 0.4), int(4 * s)), 1)
+    sup.set_alpha(int(255 * min(1.0, k * 3)))
+    sup = pygame.transform.rotate(sup, -math.degrees(ang))
+    tela.blit(sup, sup.get_rect(midbottom=(x, y)))
 
 
 def desenhar_rib(l, tela, p, branco):
+    tr = l.extra.get("tronco")
+    if tr and not getattr(l, "_clone", False):  # SUBSTITUIÇÃO: o tronco que ficou no lugar
+        import habilidades
+        k = l.s / tr[3]  # (posição do mundo -> escala em que está desenhando)
+        tronco(tela, tr[0] * k, tr[1] * k, l.s / 1.34 * 1.3, tr[2] / habilidades.TRONCO_TEMPO)
     desenhar_clones(l, tela, branco)  # Kage Bunshin: os clones atrás dele
     esc = l.s / S_REF
     d = l.lado()
@@ -616,10 +836,33 @@ def desenhar_rib(l, tela, p, branco):
     _cachecol(l, tela, mais(c, u, 1.5 * esc), d, esc, branco)
     braco(longe[0], longe[1], longe_v)
     perna(longe[2], longe[3], longe_v)
-    (TRONCO_COSTAS if costas else TRONCO).desenhar(tela, P("qd"), c, esc, espelho, perto_v)
+    no_tronco = (TRONCO_COSTAS if costas else TRONCO).desenhar(tela, P("qd"), c, esc, espelho, perto_v)
+    zumbi = l.f.get("estilo") == "zumbi" and not branco
+    if zumbi:
+        remendo(tela, no_tronco, 3.0, 4.0, esc)
     perna(perto[2], perto[3], perto_v)
-    (CABECA_COSTAS if costas else CABECA).desenhar(tela, cb, mais(cb, u, 10), esc, espelho, perto_v)
+    na_cabeca = (CABECA_COSTAS if costas else CABECA).desenhar(tela, cb, mais(cb, u, 10), esc, espelho, perto_v)
+    if zumbi:
+        remendo(tela, na_cabeca, 3.0, 5.0, esc, 3.0)
+        if not costas:  # um olho MAIOR que o outro (meio caído)
+            o = na_cabeca(10.4, 2.4)
+            pygame.draw.circle(tela, PALETA["k"], o, int(3.6 * esc))
+            pygame.draw.circle(tela, (236, 232, 170), o, int(2.9 * esc))
+            pygame.draw.circle(tela, (40, 10, 10), (o[0] + int(0.6 * esc), o[1] + int(0.8 * esc)), max(1, int(0.8 * esc)))
+            pygame.draw.line(tela, (200, 60, 60), (o[0] - 2 * esc, o[1]), (o[0] - 0.6 * esc, o[1] + 0.8 * esc), 1)
     braco(perto[0], perto[1], perto_v)
+
+
+def remendo(tela, P, x, y, esc, tam=4.0):
+    """ZUMBI: um remendo de pano costurado (quadradinho torto com os pontos da costura)."""
+    cantos = [P(x, y), P(x + tam, y + 0.4), P(x + tam - 0.3, y + tam), P(x - 0.2, y + tam - 0.3)]
+    meio = (sum(q[0] for q in cantos) / 4, sum(q[1] for q in cantos) / 4)
+    pygame.draw.polygon(tela, PALETA["k"], cantos)
+    pygame.draw.polygon(tela, (150, 110, 80), [(a * 0.8 + meio[0] * 0.2, b * 0.8 + meio[1] * 0.2) for a, b in cantos])
+    for i in range(4):  # os pontos da costura
+        a, b = cantos[i], cantos[(i + 1) % 4]
+        m = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
+        pygame.draw.line(tela, (20, 16, 10), (m[0] - 2, m[1] - 2), (m[0] + 2, m[1] + 2), 1)
 
 
 def figura_extra(q, P, s, d, cor, escura, cont, branco, t):

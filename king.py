@@ -68,13 +68,47 @@ proporcionar(POSES_KING)
 MADEIRA, MADEIRA_ESC, CORRENTE, CONT = (176, 116, 58), (110, 66, 30), (170, 172, 180), (18, 16, 24)
 
 
-def desenha_nunchaku(tela, mao, a1, a2, esc, girando=False):
+def aragorn(l):
+    """Roupa ARAGORN (código DESTEMIBLEWARRIOR): no lugar do nunchaku, a ESPADA."""
+    return l is not None and l.f.get("estilo") == "aragorn"
+
+
+def desenha_espada(tela, mao, a1, esc, girando=False):
+    """A espada do Aragorn: cabo na mão, guarda e a lâmina comprida na direção a1."""
+    if girando:  # girando rápido: um círculo prateado
+        r = int(24 * esc)
+        pygame.draw.circle(tela, (120, 124, 136), (int(mao[0]), int(mao[1])), r, max(1, int(3 * esc)))
+        pygame.draw.circle(tela, (230, 232, 240), (int(mao[0]), int(mao[1])), max(1, r - int(2 * esc)), 1)
+        return
+    c, s = math.cos(a1), math.sin(a1)
+    nx, ny = -s, c
+    cabo_ini = (mao[0] - c * 4 * esc, mao[1] - s * 4 * esc)
+    guarda = (mao[0] + c * 3 * esc, mao[1] + s * 3 * esc)
+    ponta = (mao[0] + c * 30 * esc, mao[1] + s * 30 * esc)
+    w = max(2, int(2.6 * esc))
+    lamina = [(guarda[0] + nx * w * 0.6, guarda[1] + ny * w * 0.6), (ponta[0], ponta[1]),
+              (guarda[0] - nx * w * 0.6, guarda[1] - ny * w * 0.6)]
+    pygame.draw.polygon(tela, CONT, [(x + (x - mao[0]) * 0.02, y + (y - mao[1]) * 0.02) for x, y in lamina])
+    pygame.draw.polygon(tela, CONT, lamina, max(2, int(esc)))
+    pygame.draw.polygon(tela, (214, 218, 228), lamina)
+    pygame.draw.line(tela, (250, 250, 255), guarda, ponta, 1)
+    pygame.draw.line(tela, CONT, cabo_ini, guarda, w + 2)
+    pygame.draw.line(tela, (86, 56, 34), cabo_ini, guarda, w)
+    g1, g2 = (guarda[0] + nx * 5 * esc, guarda[1] + ny * 5 * esc), (guarda[0] - nx * 5 * esc, guarda[1] - ny * 5 * esc)
+    pygame.draw.line(tela, CONT, g1, g2, w + 2)
+    pygame.draw.line(tela, (200, 170, 90), g1, g2, w)
+
+
+def desenha_nunchaku(tela, mao, a1, a2, esc, girando=False, l=None):
     """mao = onde a mão segura; a1 = direção do bastão da mão; a2 = direção do bastão solto."""
+    if aragorn(l):
+        return desenha_espada(tela, mao, a1, esc, girando)
     comp = 13 * esc
     if girando:  # girando rápido: vira um borrão redondo
         r = int(comp * 1.6)
         pygame.draw.circle(tela, MADEIRA_ESC, (int(mao[0]), int(mao[1])), r, max(1, int(3 * esc)))
         pygame.draw.circle(tela, MADEIRA, (int(mao[0]), int(mao[1])), max(1, r - int(2 * esc)), 1)
+        pygame.draw.circle(tela, (240, 196, 60), (int(mao[0]), int(mao[1])), max(1, r // 3), 1)  # (a corrente dourada)
         return
     p1 = (mao[0] + math.cos(a1) * comp, mao[1] + math.sin(a1) * comp)
     elo = (p1[0] + math.cos(a2) * 3 * esc, p1[1] + math.sin(a2) * 3 * esc)
@@ -83,7 +117,12 @@ def desenha_nunchaku(tela, mao, a1, a2, esc, girando=False):
     for a, b in ((mao, p1), (elo, p2)):
         pygame.draw.line(tela, CONT, a, b, w + 2)
         pygame.draw.line(tela, MADEIRA, a, b, w)
-    pygame.draw.line(tela, CORRENTE, p1, elo, 1)
+    # a CORRENTE DOURADA (remodel do Gomes): 3 elos grossinhos
+    for i in range(3):
+        a = (p1[0] + (elo[0] - p1[0]) * i / 3, p1[1] + (elo[1] - p1[1]) * i / 3)
+        b = (p1[0] + (elo[0] - p1[0]) * (i + 1) / 3, p1[1] + (elo[1] - p1[1]) * (i + 1) / 3)
+        pygame.draw.line(tela, CONT, a, b, max(2, int(1.8 * esc)))
+        pygame.draw.line(tela, (250, 206, 70) if i % 2 == 0 else (196, 150, 40), a, b, max(1, int(1.0 * esc)))
 
 
 # =====================================================================
@@ -118,7 +157,7 @@ class Bumerangue(Projetil):
         a = self.t * 0.6
         esc = self.dono.s * 3 / 1.36 / 2.2
         mx, my = self.x - math.cos(a) * 14 * esc, self.y - math.sin(a) * 14 * esc
-        desenha_nunchaku(tela, (mx, my), a, a, esc * 1.4)
+        desenha_nunchaku(tela, (mx, my), a, a, esc * 1.4, l=self.dono)
 
 
 def tem_nunchaku(l):
@@ -281,7 +320,7 @@ def ultimate_efeito(l, tela):
     if "pegou" not in m and t < U_CORRE_ATE + 30:
         k = min(1, t / 20)
         x, y = l.x, l.y - (120 + 160 * math.sin(min(math.pi, t / 40 * math.pi))) * l.s
-        desenha_nunchaku(tela, (x, y), t * 0.5, t * 0.5 + 1, l.s * 1.2)
+        desenha_nunchaku(tela, (x, y), t * 0.5, t * 0.5 + 1, l.s * 1.2, l=l)
 
 
 # =====================================================================
@@ -331,6 +370,9 @@ PALETA = {
     "p": (236, 196, 160), "P": (204, 160, 124), "q": (150, 108, 80),
     "h": (214, 214, 222), "H": (240, 240, 246), "j": (130, 132, 144), "x": (26, 24, 30), "X": (74, 72, 82),
     "e": (20, 20, 24),
+    # remodel do Gomes: DRAGÃO bordado dourado, BANDAGEM nas mãos, OMBREIRA de couro, COLAR de contas
+    "y": (236, 190, 64), "Y": (255, 230, 140), "w": (232, 226, 210), "W": (186, 178, 160),
+    "c": (126, 78, 44), "C": (168, 110, 64), "o": (176, 40, 34), "O": (226, 184, 120),
 }
 S_REF = 1.36 / 3
 
@@ -339,16 +381,16 @@ TRONCO = Peca([
     "..kbBBpPbbbk..",
     ".kbBBbpPbbbvk.",
     ".kbBbbkpkbbvk.",
-    ".kbBbbbkkbbvk.",
-    ".kbBbbbbkbbvk.",
-    ".kbbbbbbbkbvk.",
-    ".kbbbbbbbbkvk.",
-    ".kbbbbbbbbbvk.",
-    "..kbbbbbbbvk..",
-    "..kbbbbbbbvk..",
+    ".kbBbbbkkYyvk.",
+    ".kbBbbbbkbyvk.",
+    ".kbbbbbbbkyvk.",
+    ".kbbbbbbyykvk.",
+    ".kbbbbbyybbvk.",
+    "..kbbbbbyybk..",
+    "..kbbbbbbyyk..",
     "..kbbbbbbvvk..",
-    "..kxxxxxxxxk..",
-    "..kxXxxxxxxk..",
+    "..kxxxXxxxxk..",
+    "..kxXxxxxXxk..",
     "..kbkxxxkbvk..",
     "..kbbkxkbbvk..",
     "..kbbbbbbbvk..",
@@ -363,15 +405,15 @@ TRONCO = Peca([
 TRONCO_COSTAS = Peca([
     "...kkkkkkkk...",
     "..kbBBBbbbbk..",
-    ".kbBBbbbbbbvk.",
-    ".kbBbbbbbbbvk.",
-    ".kbBbbbbbbbvk.",
-    ".kbBbbbbbbbvk.",
-    ".kbbbbbbbbbvk.",
-    ".kbbbbbbbbbvk.",
-    ".kbbbbbbbbbvk.",
-    "..kbbbbbbbvk..",
-    "..kbbbbbbbvk..",
+    ".kbBYYybbbbvk.",
+    ".kbByyyyybbvk.",
+    ".kbBbbbyyybvk.",
+    ".kbBbbyyybbvk.",
+    ".kbbbyyybbbvk.",
+    ".kbbyyybbbbvk.",
+    ".kbbyyyyybbvk.",
+    "..kbbbbyyyvk..",
+    "..kbbbbbyyvk..",
     "..kbbbbbbvvk..",
     "..kxxxxxxxxk..",
     "..kxXxxxxxxk..",
@@ -481,6 +523,180 @@ ANTEBRACO = Peca([
     "kpPqk",
     "kpPqk",
     "kppqk",
+    "kwWwk",
+    "kWwWk",
+    "kwWwk",
+    "kWwWk",
+    "kwWwk",
+    ".kkk.",
+], PALETA, a=(2, 0), b=(2, 10))
+
+MAO = Peca([
+    ".kkkk.",
+    "kwWWwk",
+    "kWwWwk",
+    "kpqqqk",
+    ".kkkk.",
+], PALETA, a=(2, 0), b=(2, 4), estica=False)
+
+OMBREIRA = Peca([
+    "..kkkkkk..",
+    ".kCCCcccck",
+    "kCCcccccck",
+    "kCcoOcccck",
+    "kccccccock",
+    "kkkkkkkkkk",
+    "..kxk.kxk.",
+], PALETA, a=(5, 2), b=(5, 8), estica=False)
+
+
+TRONCO_ANTIGO = Peca([
+    "...kkkkkkkk...",
+    "..kbBBpPbbbk..",
+    ".kbBBbpPbbbvk.",
+    ".kbBbbkpkbbvk.",
+    ".kbBbbbkkbbvk.",
+    ".kbBbbbbkbbvk.",
+    ".kbbbbbbbkbvk.",
+    ".kbbbbbbbbkvk.",
+    ".kbbbbbbbbbvk.",
+    "..kbbbbbbbvk..",
+    "..kbbbbbbbvk..",
+    "..kbbbbbbvvk..",
+    "..kxxxxxxxxk..",
+    "..kxXxxxxxxk..",
+    "..kbkxxxkbvk..",
+    "..kbbkxkbbvk..",
+    "..kbbbbbbbvk..",
+    "..kbbbbbbbvk..",
+    "..kbbbbbbvvk..",
+    "..kbbbbbbvvk..",
+    "..kbbbbbvvvk..",
+    "...kbbbbvvk...",
+    "....kkkkkk....",
+], PALETA, a=(7, 20), b=(7, 1))
+
+TRONCO_COSTAS_ANTIGO = Peca([
+    "...kkkkkkkk...",
+    "..kbBBBbbbbk..",
+    ".kbBBbbbbbbvk.",
+    ".kbBbbbbbbbvk.",
+    ".kbBbbbbbbbvk.",
+    ".kbBbbbbbbbvk.",
+    ".kbbbbbbbbbvk.",
+    ".kbbbbbbbbbvk.",
+    ".kbbbbbbbbbvk.",
+    "..kbbbbbbbvk..",
+    "..kbbbbbbbvk..",
+    "..kbbbbbbvvk..",
+    "..kxxxxxxxxk..",
+    "..kxXxxxxxxk..",
+    "..kxxxxxxxxk..",
+    "..kbbbbbbbvk..",
+    "..kbbbbbbbvk..",
+    "..kbbbbbbbvk..",
+    "..kbbbbbbvvk..",
+    "..kbbbbbbvvk..",
+    "..kbbbbbvvvk..",
+    "...kbbbbvvk...",
+    "....kkkkkk....",
+], PALETA, a=(7, 20), b=(7, 1))
+
+CABECA_ANTIGO = Peca([
+    "....kkk......",
+    "..kkhHhk.kk..",
+    ".khHHHhkkhHk.",
+    "khHHhhhhhhHk.",
+    "kHhhhhhhhhhk.",
+    "kjhhkkkkkkhk.",
+    "kjhkpppkepk..",
+    ".kjkpppppppk.",
+    ".kjkppppPppk.",
+    "..kkhhhhhpk..",
+    "..khhhhhhhk..",
+    "...khhhhhk...",
+    "....kkkkk....",
+], PALETA, a=(6, 7), b=(6, 0), estica=False)
+
+CABECA_COSTAS_ANTIGO = Peca([
+    "....kkk......",
+    "..kkhHhk.kk..",
+    ".khHHHhkkhHk.",
+    "khHHhhhhhhHk.",
+    "kHhhhhhhhhhk.",
+    "kjhhhhhhhhhk.",
+    "kjhhhhhhhhk..",
+    ".kjhhhhhhhk..",
+    ".kjhhhhhhhk..",
+    "..kkhhhhpk...",
+    "..kpppppk....",
+    "...kpppk.....",
+    "....kkk......",
+], PALETA, a=(6, 7), b=(6, 0), estica=False)
+
+COXA_ANTIGO = Peca([
+    ".kkkkkk.",
+    "kbBbbbvk",
+    "kBbbbbvk",
+    "kBbbbbvk",
+    "kbbbbbvk",
+    "kbbbbbvk",
+    "kbbbbvvk",
+    "kbbbbvvk",
+    "kbbbvvvk",
+    ".kbbvvk.",
+    ".kbbvvk.",
+    ".kbvvvk.",
+    "..kvvk..",
+    "..kkkk..",
+], PALETA, a=(3, 0), b=(3, 13))
+
+CANELA_ANTIGO = Peca([
+    ".kkkkk.",
+    "kbbbbvk",
+    "kbbbbvk",
+    "kbbbbvk",
+    "kbbbvvk",
+    "kbbbvvk",
+    "kbbbvvk",
+    "kbbvvvk",
+    "kbbvvvk",
+    "kbvvvvk",
+    "kkkkkkk",
+    ".kpPqk.",
+    ".kpPqk.",
+    "..kkk..",
+], PALETA, a=(3, 0), b=(3, 13))
+
+PE_ANTIGO = Peca([
+    ".kkkk......",
+    "kpPPqkkkk..",
+    "kpppppPPpk.",
+    "kqqqqqqqqk.",
+    ".kkkkkkkk..",
+], PALETA, a=(3, 1), b=(9, 1), estica=False)
+
+BRACO_ANTIGO = Peca([
+    ".kkkk.",
+    "kbBbvk",
+    "kbBbvk",
+    "kbbbvk",
+    "kbbbvk",
+    "kbbbvk",
+    "kbbvvk",
+    "kbbvvk",
+    "kbvvvk",
+    "kkkkkk",
+    ".kpqk.",
+    ".kkkk.",
+], PALETA, a=(2, 0), b=(2, 11))
+
+ANTEBRACO_ANTIGO = Peca([
+    ".kkk.",
+    "kpPqk",
+    "kpPqk",
+    "kpPqk",
+    "kppqk",
     "kppqk",
     "kpPqk",
     "kpPqk",
@@ -489,7 +705,7 @@ ANTEBRACO = Peca([
     ".kkk.",
 ], PALETA, a=(2, 0), b=(2, 10))
 
-MAO = Peca([
+MAO_ANTIGO = Peca([
     ".kkkk.",
     "kpPPqk",
     "kpPpqk",
@@ -498,7 +714,30 @@ MAO = Peca([
 ], PALETA, a=(2, 0), b=(2, 4), estica=False)
 
 
+def colar(tela, l, p, esc, branco):
+    """O COLAR DE CONTAS (de monge): um U de contas grandes no peito, com uma conta maior embaixo."""
+    def U(u):
+        return l.ponto({"_": u}, "_")
+    pc = p["pc"]
+    k = (150, 150, 160) if branco else PALETA["k"]
+    for i in range(7):
+        a = math.pi * (0.15 + 0.7 * i / 6)
+        u = (pc[0] + 9 + math.cos(a) * 5, pc[1] - 2 - math.sin(a) * 8)
+        x, y = U(u)
+        r = (2.0 if i == 3 else 1.5) * esc
+        cor = (245, 245, 250) if branco else (PALETA["O"] if i % 2 else PALETA["o"])
+        pygame.draw.circle(tela, k, (round(x), round(y)), max(2, round(r + 0.6 * esc)))
+        pygame.draw.circle(tela, cor, (round(x), round(y)), max(1, round(r)))
+
+
 def desenhar_king(l, tela, p, branco):
+    if aragorn(l):  # (o GUARDIÃO ERRANTE é outra roupa: fica com o desenho antigo, sem dragão nem colar)
+        return _desenhar_king(l, tela, p, branco, TRONCO_ANTIGO, TRONCO_COSTAS_ANTIGO, BRACO_ANTIGO, ANTEBRACO_ANTIGO,
+                              MAO_ANTIGO, enfeites=False)
+    return _desenhar_king(l, tela, p, branco, TRONCO, TRONCO_COSTAS, BRACO, ANTEBRACO, MAO, enfeites=True)
+
+
+def _desenhar_king(l, tela, p, branco, TRONCO, TRONCO_COSTAS, BRACO, ANTEBRACO, MAO, enfeites):
     esc = l.s / S_REF
     d = l.lado()
     espelho = d < 0
@@ -533,8 +772,19 @@ def desenhar_king(l, tela, p, branco):
     u, _ = cabeca_eixos(c, cb, d)
     pygame.draw.line(tela, PALETA["k"], c, mais(cb, u, -3 * esc), max(3, int(5 * esc)))
     pygame.draw.line(tela, PALETA["P"] if not branco else (240, 240, 240), c, mais(cb, u, -3 * esc), max(1, int(3 * esc)))
-    (CABECA_COSTAS if costas else CABECA).desenhar(tela, cb, mais(cb, u, 10), esc, espelho, perto_v)
+    na_cabeca = (CABECA_COSTAS if costas else CABECA).desenhar(tela, cb, mais(cb, u, 10), esc, espelho, perto_v)
+    if aragorn(l) and not branco:  # ARAGORN: o cabelo comprido caindo até os ombros
+        for k, (x0, x1) in enumerate(((0.6, -1.2), (2.2, 0.4), (3.6, 2.4))):
+            pts = [na_cabeca(x0 - 0.8, 4), na_cabeca(x1 - 0.6, 14 + k), na_cabeca(x1 + 1.4, 14.5 + k),
+                   na_cabeca(x0 + 1.6, 5)]
+            pygame.draw.polygon(tela, PALETA["k"], pts)
+            pygame.draw.polygon(tela, (70, 48, 32) if k % 2 == 0 else (96, 66, 44),
+                                [(x + (sum(q[0] for q in pts) / 4 - x) * 0.25, y) for x, y in pts])
     braco(perto[0], perto[1], perto_v)
+    if enfeites:  # a OMBREIRA DE COURO, só no ombro da frente
+        OMBREIRA.desenhar(tela, (c[0] + 2 * esc * d, c[1] + 1 * esc), P(perto[0]), esc, espelho, perto_v)
+        if not costas:  # o COLAR DE CONTAS (por cima de tudo, no pescoço e no peito)
+            colar(tela, l, p, esc, branco)
     # o nunchaku na mão da frente
     jogado = l.extra.get("nunchaku_fora") or (l.estado == "ataque" and l.nome_golpe == "king_ultimate"
                                                and "pegou" not in l.memo)
@@ -548,10 +798,10 @@ def desenhar_king(l, tela, p, branco):
         if l.estado == "ataque" and l.nome_golpe == "king_salto" and "pino" in l.memo and l.t < S_VOA:
             px, py = l.memo["pino"]
             desenha_nunchaku(tela, (px / (LARGURA / tela.get_width()), py / (ALTURA / tela.get_height()) - 1),
-                             -math.pi / 2, -math.pi / 2, esc)
+                             -math.pi / 2, -math.pi / 2, esc, l=l)
         else:
             a2 = math.pi / 2 + math.sin(l.t * 0.12) * 0.4  # o bastão solto balança
-            desenha_nunchaku(tela, mao, a1, a2, esc, girando)
+            desenha_nunchaku(tela, mao, a1, a2, esc, girando, l=l)
 
 
 def figura_extra(q, P, s, d, cor, escura, cont, branco, t):

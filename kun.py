@@ -57,8 +57,32 @@ VERMELHO_CARTA = (210, 40, 40)
 # =====================================================================
 # A carta (na mão, voando, no chão)
 # =====================================================================
-def carta(tela, pos, ang, esc, largura=1.0, brilha=False):
-    """Uma carta de baralho. 'largura' < 1 = virando (efeito de girar em 3D)."""
+def ash(l):
+    """Roupa ASH (código CARD&FIGHT): as cartas que ele JOGA viram Pokébolas (na mão continua carta) e o boné."""
+    return l is not None and l.f.get("estilo") == "ash"
+
+
+def pokebola(tela, pos, ang, esc, brilha=False):
+    """A Pokébola (no lugar da carta, na roupa ASH)."""
+    r = max(3, int(5.4 * esc))
+    x, y = int(pos[0]), int(pos[1])
+    if brilha:
+        brilho(tela, (x, y), int(12 * esc), (255, 230, 150), 120)
+    pygame.draw.circle(tela, (16, 14, 20), (x, y), r + max(1, int(esc * 0.8)))
+    pygame.draw.circle(tela, (250, 250, 250), (x, y), r)
+    c, s = math.cos(ang), math.sin(ang)  # a metade vermelha (gira junto)
+    meia = [(x + (math.cos(a) * c - math.sin(a) * s) * r, y + (math.cos(a) * s + math.sin(a) * c) * r)
+            for a in [math.pi + k * math.pi / 10 for k in range(11)]]
+    pygame.draw.polygon(tela, (226, 36, 40), meia)
+    pygame.draw.line(tela, (16, 14, 20), (x - c * r, y - s * r), (x + c * r, y + s * r), max(1, int(esc * 1.1)))
+    pygame.draw.circle(tela, (16, 14, 20), (x, y), max(2, int(1.8 * esc)))
+    pygame.draw.circle(tela, (250, 250, 250), (x, y), max(1, int(1.1 * esc)))
+
+
+def carta(tela, pos, ang, esc, largura=1.0, brilha=False, l=None):
+    """Uma carta de baralho. 'largura' < 1 = virando (efeito de girar em 3D). (l = quem joga: no ASH é Pokébola)"""
+    if ash(l):
+        return pokebola(tela, pos, ang, esc, brilha)
     w, h = 5 * esc * max(0.15, abs(largura)), 7 * esc
     c, s = math.cos(ang), math.sin(ang)
     pts = [(pos[0] + x * c - y * s, pos[1] + x * s + y * c) for x, y in ((-w, -h), (w, -h), (w, h), (-w, h))]
@@ -70,8 +94,10 @@ def carta(tela, pos, ang, esc, largura=1.0, brilha=False):
         pygame.draw.circle(tela, VERMELHO_CARTA, (int(pos[0]), int(pos[1])), max(1, int(esc * 1.6)))
 
 
-def carta_no_chao(tela, x, s, t, brilha=True):
-    """Carta deitada no chão (achatada), brilhando."""
+def carta_no_chao(tela, x, s, t, brilha=True, l=None):
+    """Carta deitada no chão (achatada), brilhando. (ASH: uma Pokébola no chão)"""
+    if ash(l):
+        return pokebola(tela, (x, CHAO - 6 * s), 0, 2.2 * s, brilha)
     w, h = 20 * s, 6 * s
     if brilha:
         brilho(tela, (int(x), int(CHAO - 2)), int((26 + 4 * math.sin(t * 0.3)) * s), (255, 220, 140), 110)
@@ -95,7 +121,7 @@ def desenha_carta_voando(p, tela):
     for i in range(3):  # rastro
         x = p.x - p.vx * (i + 1) * 0.8
         pygame.draw.line(tela, (230, 220, 200), (x - 4, p.y), (x + 4, p.y), max(1, 3 - i))
-    carta(tela, (p.x, p.y), p.t * 0.5 * (1 if p.vx > 0 else -1), esc, math.cos(p.t * 0.7))
+    carta(tela, (p.x, p.y), p.t * 0.5 * (1 if p.vx > 0 else -1), esc, math.cos(p.t * 0.7), l=p.dono)
 
 
 # =====================================================================
@@ -217,7 +243,7 @@ def teleporte(l, outro, jogo):
 def teleporte_efeito(l, tela):
     m = l.memo
     if "carta_x" in m and l.t < S_TELE + 4:
-        carta_no_chao(tela, m["carta_x"], l.s / 1.36, l.t)
+        carta_no_chao(tela, m["carta_x"], l.s / 1.36, l.t, l=l)
 
 
 # =====================================================================
@@ -330,7 +356,7 @@ def ultimate_efeito(l, tela):
     if t < U_JOGA:
         return
     x = _carta_x(l)
-    carta_no_chao(tela, x, l.s / 1.36, t)
+    carta_no_chao(tela, x, l.s / 1.36, t, l=l)
     for i, (tipo, _) in enumerate(MOVEIS):
         u = t - (U_SAI + i * U_INTERVALO)
         if 0 <= u < U_CHUTA:  # o móvel saindo da carta
@@ -395,167 +421,198 @@ GOLPES_KUN = {"E": "kun_carta", "Q": "kun_shoryuken", "R": "kun_espada", "SHIFT"
 PALETA = {
     "k": (16, 14, 20), "R": (226, 84, 70), "r": (176, 44, 42), "v": (112, 24, 30), "w": (244, 242, 236),
     "e": (24, 22, 28), "p": (240, 206, 170), "P": (212, 172, 136), "q": (160, 120, 90), "h": (28, 26, 34),
-    "H": (70, 68, 86), "c": (56, 60, 78), "C": (88, 92, 112), "s": (240, 240, 244), "S": (176, 176, 188),
+    "H": (70, 68, 86), "c": (40, 40, 52), "C": (70, 72, 90), "s": (34, 32, 42), "S": (150, 150, 168),
     "o": (20, 20, 24),
     "b": (160, 120, 90), "B": (240, 206, 170),  # boca e cantinhos da boca (= pele; no CORINGA viram o sorriso vermelho)
+    "g": (40, 170, 90), "G": (20, 100, 56),     # a VISEIRA verde de crupiê (transparente: a luz passa verde)
 }
+# (o remodel de CRUPIÊ, pedido do Gomes: colete, camisa de manga dobrada, gravata borboleta, ligas nos braços,
+#  viseira verde, calça social e sapato. As letras são as mesmas de antes: as roupas da loja continuam valendo.)
 S_REF = 1.36 / 3
 
 TRONCO = Peca([
-    "...kkkkkkkk...",
-    "..krRRrrrrrk..",
-    ".krRRrrrrrrvk.",
-    ".krRrrrrrrrvk.",
-    ".krRrkkkkkrvk.",
-    ".krRrkwewkrvk.",
-    ".krrrkeeekrvk.",
-    ".krrrkeeekrvk.",
-    ".krrrkwewkrvk.",
-    "..krrkwwwkvk..",
-    "..krrkkkkkvk..",
-    "..krrrrrrrvk..",
-    "..krrrrrrvvk..",
-    "..kRrrrrrrvk..",
-    "..kvvvvvvvvk..",
-    "..kcccccccCk..",
-    "..kcccccccCk..",
-    "..kccccccCCk..",
-    "..kccccccCCk..",
-    "...kcccccCk...",
-    "....kkkkkk....",
-], PALETA, a=(7, 18), b=(7, 1))
+    ".....kkkkkkkk.....",
+    "....kwwwkekwwwk...",
+    "...kwwwkeeekwwwk..",
+    "..kRRrwwkekwwrrvk.",
+    ".kRRRrrrwwwwrrrvvk",
+    ".kRRrrrrwwwwrrrrvk",
+    ".kRRrrrrrwwrrrrrvk",
+    ".kRrrrrrrwrrrrrrvk",
+    ".kRrrrrrrerrrrrrvk",
+    ".kRrrrrrrrrrrrrrvk",
+    ".kRrrrrrrerrrrrrvk",
+    ".kRrrrrrrrrrrrrrvk",
+    "..kRrrrrrerrrrrvk.",
+    "..kRrrrrrrrrrrrvk.",
+    "..kRrrrrrrrrrrrvk.",
+    "..kRrrrkkkkrrrrvk.",
+    "..krrrkwwwwkrrrvk.",
+    "..keeeeeSSeeeeeek.",
+    "..kcccccccccccCCk.",
+    "..kcCccccccccCCCk.",
+    "...kccccccccccCk..",
+    "...kcccccccccCCk..",
+    "....kkkkkkkkkkk...",
+], PALETA, a=(9, 20), b=(9, 1))
 
 TRONCO_COSTAS = Peca([
-    "...kkkkkkkk...",
-    "..krRRrrrrrk..",
-    ".krRRrrrrrrvk.",
-    ".krRrrrrrrrvk.",
-    ".krRrrrrrrrvk.",
-    ".krRrrrrrrrvk.",
-    ".krrrrrrrrrvk.",
-    ".krrrrrrrrrvk.",
-    ".krrrrrrrrrvk.",
-    "..krrrrrrrvk..",
-    "..krrrrrrrvk..",
-    "..krrrrrrrvk..",
-    "..krrrrrrvvk..",
-    "..kRrrrrrrvk..",
-    "..kvvvvvvvvk..",
-    "..kcccccccCk..",
-    "..kcccccccCk..",
-    "..kccccccCCk..",
-    "..kccccccCCk..",
-    "...kcccccCk...",
-    "....kkkkkk....",
-], PALETA, a=(7, 18), b=(7, 1))
+    ".....kkkkkkkk.....",
+    "....kwwwwwwwwk....",
+    "...kwwwwwwwwwwk...",
+    "..kRRrrrrrrrrrvk..",
+    ".kRRrrrrrrrrrrrvk.",
+    ".kRRrrrrrrrrrrrvvk",
+    ".kRrrrrrrrrrrrrrvk",
+    ".kRrrrrrrrrrrrrrvk",
+    ".kRrrrrkkkkkrrrrvk",
+    ".kRrrrrkeeekrrrrvk",
+    ".kRrrrrkkkkkrrrrvk",
+    ".kRrrrrrrrrrrrrrvk",
+    "..kRrrrrrrrrrrrvk.",
+    "..kRrrrrrrrrrrrvk.",
+    "..kRrrrrrrrrrrrvk.",
+    "..kRrrrrrrrrrrrvk.",
+    "..krrrrrrrrrrrrvk.",
+    "..keeeeeeeeeeeeek.",
+    "..kcccccccccccCCk.",
+    "..kcCccccccccCCCk.",
+    "...kccccccccccCk..",
+    "...kcccccccccCCk..",
+    "....kkkkkkkkkkk...",
+], PALETA, a=(9, 20), b=(9, 1))
 
 CABECA = Peca([
-    "..kkkkkk.....",
-    ".khhHhhhkk...",
-    "khhHhhhhhhk..",
-    "khhhhhhhhhhk.",
-    "khhhhhhhhhhk.",
-    "khhhhpphhpk..",
-    "khhkpppkopk..",
-    ".khkppppppk..",
-    ".kkpppppPpk..",
-    "..kppBppBpk..",
-    "..kkppbbpk...",
-    "...kkpppk....",
-    "....kkkk.....",
-], PALETA, a=(6, 7), b=(6, 0), estica=False)
+    "....k.kk.k......",
+    "...khkhhkhk.....",
+    "..khhHhhHhhk....",
+    ".khhHhhhhhhhk...",
+    ".kggggggggggggk.",
+    ".kGGGGGGGGGGGGGk",
+    ".khhhhpppppk....",
+    ".khhkppkkpppk...",
+    ".khPpppkoopk....",
+    ".khkppppppPk....",
+    "..kppppppPpk....",
+    "..kppBppBpk.....",
+    "..kkppbbpk......",
+    "...kkpppk.......",
+    "....kkkk........",
+], PALETA, a=(6, 9), b=(6, 2), estica=False)
 
 CABECA_COSTAS = Peca([
-    "..kkkkkk.....",
-    ".khhHhhhkk...",
-    "khhHhhhhhhk..",
-    "khhhhhhhhhhk.",
-    "khhhhhhhhhhk.",
-    "khhhhhhhhhk..",
-    "khhhhhhhhhk..",
-    ".khhhhhhhhk..",
-    ".kkhhhhhhhk..",
-    "..kkhhhhpk...",
-    "..kppppppk...",
-    "...kkpppk....",
-    "....kkkk.....",
-], PALETA, a=(6, 7), b=(6, 0), estica=False)
+    "....k.kk.k......",
+    "...khkhhkhk.....",
+    "..khhHhhHhhk....",
+    ".khhHhhhhhhhk...",
+    ".kgggggggggggk..",
+    ".kGhhhhhhhhhGk..",
+    ".khhhhhhhhhhk...",
+    ".khhhhhhhhhhk...",
+    ".khhhhhhhhhk....",
+    ".khhhhhhhhhk....",
+    "..khhhhhhhpk....",
+    "..khhhhhhpk.....",
+    "..kkpppppk......",
+    "...kkpppk.......",
+    "....kkkk........",
+], PALETA, a=(6, 9), b=(6, 2), estica=False)
+
+# (sem a viseira: pro TREINADOR, que usa o boné)
+CABECA_SEM_VISEIRA = Peca([
+    "....k.kk.k......",
+    "...khkhhkhk.....",
+    "..khhHhhHhhk....",
+    ".khhHhhhhhhhk...",
+    ".khhhhhhhhhhhk..",
+    ".khhhhhhhhhhk...",
+    ".khhhhpppppk....",
+    ".khhkppkkpppk...",
+    ".khPpppkoopk....",
+    ".khkppppppPk....",
+    "..kppppppPpk....",
+    "..kppBppBpk.....",
+    "..kkppbbpk......",
+    "...kkpppk.......",
+    "....kkkk........",
+], PALETA, a=(6, 9), b=(6, 2), estica=False)
 
 COXA = Peca([
+    ".kkkkkkk.",
+    "kcCccccCk",
+    "kCcccccck",
+    "kCcccccck",
+    "kCccccCck",
+    "kCcccccck",
+    "kCcccccck",
+    "kCccCccck",
+    "kCcccccck",
+    ".kCccccck",
+    ".kCccccck",
+    ".kCcccck.",
+    "..kcccck.",
+    "..kkkkk..",
+], PALETA, a=(4, 0), b=(4, 13))
+
+CANELA = Peca([
     ".kkkkkk.",
     "kcCcccck",
     "kCccccck",
-    "kcccccck",
-    "kcccccck",
-    "kcccccck",
-    "kcccccck",
-    "kcccccck",
-    "kcccccck",
+    "kCcCccck",
+    "kCccccck",
+    "kCccccck",
+    "kCccccck",
+    "kCccccCk",
+    "kCccccck",
+    "kCccccck",
+    "kCccccck",
+    "kCccccck",
     ".kcccck.",
-    ".kcccck.",
-    ".kcccck.",
-    "..kcck..",
     "..kkkk..",
 ], PALETA, a=(3, 0), b=(3, 13))
 
-CANELA = Peca([
-    ".kkkkk.",
-    "kcCccck",
-    "kccccck",
-    "kccccck",
-    "kccccck",
-    "kccccck",
-    "kccccck",
-    "kccccck",
-    "kccccck",
-    "kccccck",
-    "kccccck",
-    ".kccck.",
-    ".kccck.",
-    "..kkk..",
-], PALETA, a=(3, 0), b=(3, 13))
-
 TENIS = Peca([
-    ".kkkkk.....",
-    "ksssSkkkk..",
-    "kssssssssk.",
-    "kSSSSSSSSSk",
+    ".kkkk......",
+    "ksSskkkk...",
+    "kssssSSsk..",
+    "kssssssssSk",
     "kkkkkkkkkkk",
 ], PALETA, a=(3, 1), b=(9, 1), estica=False)
 
 BRACO = Peca([
-    ".kkkk.",
-    "krRrvk",
-    "krRrvk",
-    "krrrvk",
-    "krrrvk",
-    "krrrvk",
-    "krrvvk",
-    "krrvvk",
-    "krvvvk",
-    ".kkkk.",
-], PALETA, a=(2, 0), b=(2, 9))
+    ".kkkkk.",
+    "kwwwwwk",
+    "kwwwwwk",
+    "kwwwwwk",
+    "kwwwwwk",
+    "keeeeek",
+    "kwwwwwk",
+    "kwwwwwk",
+    "kwwwwwk",
+    ".kkkkk.",
+], PALETA, a=(3, 0), b=(3, 9))
 
 ANTEBRACO = Peca([
-    ".kkk.",
-    "krRvk",
-    "krrvk",
-    "krrvk",
-    "krrvk",
-    "krrvk",
-    "krvvk",
-    "kvvvk",
-    "kpPqk",
-    ".kkk.",
-], PALETA, a=(2, 0), b=(2, 9))
+    ".kkkkk.",
+    "kwwwwwk",
+    "kwwwwwk",
+    "kkkkkkk",
+    "kppPPqk",
+    "kppPqqk",
+    "kpPPqqk",
+    "kpPPqqk",
+    "kpPqqqk",
+    ".kkkkk.",
+], PALETA, a=(3, 0), b=(3, 9))
 
 MAO = Peca([
-    ".kkkk.",
-    "kpPPqk",
-    "kpPpqk",
-    "kqqqqk",
-    ".kkkk.",
-], PALETA, a=(2, 0), b=(2, 4), estica=False)
+    ".kkkkk.",
+    "kpPPpqk",
+    "kpkPkqk",
+    "kpPpPqk",
+    "kqqqqqk",
+    ".kkkkk.",
+], PALETA, a=(3, 0), b=(3, 5), estica=False)
 
 
 def desenhar_kun(l, tela, p, branco):
@@ -594,14 +651,32 @@ def desenhar_kun(l, tela, p, branco):
     pygame.draw.line(tela, PALETA["k"], c, mais(cb, u, -3 * esc), max(3, int(5 * esc)))
     pescoco = (pecas.TROCA or {}).get("P", PALETA["P"])  # (segue a roupa: no CORINGA é branco)
     pygame.draw.line(tela, pescoco if not branco else (240, 240, 240), c, mais(cb, u, -3 * esc), max(1, int(3 * esc)))
-    (CABECA_COSTAS if costas else CABECA).desenhar(tela, cb, mais(cb, u, 10), esc, espelho, perto_v)
+    cabeca = CABECA_COSTAS if costas else (CABECA_SEM_VISEIRA if ash(l) else CABECA)
+    na_cabeca = cabeca.desenhar(tela, cb, mais(cb, u, 10), esc, espelho, perto_v)
+    if ash(l) and not branco:
+        bone_ash(tela, na_cabeca, esc)
     braco(perto[0], perto[1], perto_v)
     # a carta na mão da frente (quando não está fazendo golpe que desenha a dele)
     golpe_com_carta = l.estado == "ataque" and l.nome_golpe in ("kun_shoryuken", "kun_espada")
     if not golpe_com_carta and not branco:
         m, cot = P(perto[1]), P(perto[0])
         dm, _ = eixos(cot, m)
-        carta(tela, mais(m, dm, 3), math.atan2(dm[1], dm[0]), esc * 0.45, 1)
+        carta(tela, mais(m, dm, 3), math.atan2(dm[1], dm[0]), esc * 0.45, 1)  # (na mão é carta até no ASH)
+
+
+def bone_ash(tela, P, esc):
+    """ASH: o boné vermelho com a frente branca e o símbolo verde."""
+    borda = (16, 14, 20)
+    copa = [P(0.2, 5.2), P(0.2, 2.6), P(2.4, 0.2), P(7, -0.8), P(10.6, 0.6), P(11.8, 3), P(11.8, 5.2)]
+    aba = [P(9, 4.4), P(16, 5.0), P(16, 6.4), P(9, 6.2)]
+    for pts in (copa, aba):
+        pygame.draw.polygon(tela, borda, pts)
+        pygame.draw.polygon(tela, borda, pts, max(2, int(esc * 1.2)))
+    pygame.draw.polygon(tela, (220, 30, 40), copa)
+    pygame.draw.polygon(tela, (250, 250, 250), [P(6.2, 0), P(10.4, 0.9), P(11.4, 4.6), P(6.6, 4.6)])
+    pygame.draw.polygon(tela, (40, 160, 70), [P(7.6, 1.6), P(8.6, 1.6), P(8.6, 3.0), P(10, 3.0), P(10, 3.8),
+                                              P(7.6, 3.8)])  # o símbolo verde
+    pygame.draw.polygon(tela, (220, 30, 40), aba)
 
 
 def figura_extra(q, P, s, d, cor, escura, cont, branco, t):
@@ -642,9 +717,9 @@ def entrada_efeito(l, tela, t):
         k = t / E_CAI
         y = -40 + (CHAO - 20 + 40) * k
         x = l.x + math.sin(t * 0.25) * 30 * (1 - k)
-        carta(tela, (x, y), t * 0.3, 3.0 * s, math.cos(t * 0.4), brilha=True)
+        carta(tela, (x, y), t * 0.3, 3.0 * s, math.cos(t * 0.4), brilha=True, l=l)
     elif t < E_PUF + 8:
-        carta_no_chao(tela, l.x, s, t)
+        carta_no_chao(tela, l.x, s, t, l=l)
 
 
 # =====================================================================
@@ -665,4 +740,4 @@ def vitoria_efeito(l, tela, t):
         k = ((t * 0.08) + i / 6) % 1
         x = a[0] + (b[0] - a[0]) * k
         y = a[1] + (b[1] - a[1]) * k - math.sin(k * math.pi) * 50 * l.s
-        carta(tela, (x, y), k * 3, 2.0 * l.s / 1.36, math.cos(k * 6))
+        carta(tela, (x, y), k * 3, 2.0 * l.s / 1.36, math.cos(k * 6), l=l)

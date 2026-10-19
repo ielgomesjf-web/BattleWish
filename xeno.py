@@ -1,4 +1,4 @@
-"""XENOMORPH: o monstro do jogo de terror do Gomes, agora no BATTLE WISH.
+"""TROMOS (TROMOSTOU ERGATITIRIOU; era o "Xenomorph"): o monstro do jogo de terror do Gomes, agora no BATTLE WISH.
 
 Aparência: preto, cabeça comprida com crista, olhos amarelos (os mesmos da floresta), tubos nas costas,
 cauda com ferrão, curvado que nem aranha. E a SEGUNDA BOCA.
@@ -68,9 +68,10 @@ def pontos_cauda(l, p):
     qx, qy = p["qd"]
     t = l.t
     normal = []
-    for i in range(13):
-        onda = math.sin(t * 0.12 + i * 0.55) * i * 0.7
-        normal.append((qx - 8 - i * 7.5, qy + 4 + i * 3.2 + onda))
+    for i in range(13):  # (remodel do Gomes: a cauda CURVADA, subindo na ponta)
+        onda = math.sin(t * 0.12 + i * 0.55) * i * 0.5
+        curva = max(0, i - 6) ** 2 * 1.1
+        normal.append((qx - 8 - i * 6.2 + max(0, i - 8) * 2.6, qy + 4 + i * 4.2 - curva + onda))
     rabada = l.estado == "ataque" and l.nome_golpe == "xeno_rabada"
     rasteja = l.estado == "ataque" and l.nome_golpe == "xeno_rasteja"
     if rasteja:
@@ -88,29 +89,47 @@ def pontos_cauda(l, p):
     return normal
 
 
+def cor(letra):
+    """A cor da paleta, seguindo a roupa (o rabo, os tubos e o ferrão são desenhados por código)."""
+    import pecas
+    return (pecas.TROCA or {}).get(letra, PALETA[letra])
+
+
 def desenha_cauda(tela, l, p, esc, branco):
     pts = [Pt(l, x, y) for x, y in pontos_cauda(l, p)]
+    indominus = l.f.get("estilo") == "indominus"
     for i in range(len(pts) - 1):
         w = max(1, int((4.2 - i * 0.28) * esc))
         pygame.draw.line(tela, PALETA["k"], pts[i], pts[i + 1], w + 2)
-        pygame.draw.line(tela, (240, 240, 240) if branco else (PALETA["x"] if i % 2 else PALETA["X"]),
-                         pts[i], pts[i + 1], w)
+        if indominus:  # INDOMINUS: a cauda branca com listras cinza-escuras
+            c = (78, 80, 88) if i % 2 else cor("X")
+        else:
+            c = cor("x") if i % 2 else cor("X")
+        pygame.draw.line(tela, (240, 240, 240) if branco else c, pts[i], pts[i + 1], w)
     (dx, dy), _ = eixos(pts[-2], pts[-1])  # o ferrão
     a = pts[-1]
     nx, ny = -dy, dx
     ponta = (a[0] + dx * 9 * esc, a[1] + dy * 9 * esc)
     lam = [(a[0] + nx * 3 * esc, a[1] + ny * 3 * esc), ponta, (a[0] - nx * 3 * esc, a[1] - ny * 3 * esc)]
     pygame.draw.polygon(tela, PALETA["k"], lam)
-    pygame.draw.polygon(tela, (240, 240, 240) if branco else PALETA["s"], lam, max(1, int(esc * 0.6)))
+    pygame.draw.polygon(tela, (240, 240, 240) if branco else cor("s"), lam, max(1, int(esc * 0.6)))
 
 
 def desenha_tubos(tela, l, p, esc, branco):
     px, py = p["pc"]
+    if l.f.get("estilo") == "indominus" and not branco:  # INDOMINUS: os espinhos (osteodermos) nas costas
+        for i in range(5):
+            base = Pt(l, px - 4 - i * 4, py + 4 - i * 6)
+            ponta = Pt(l, px - 12 - i * 4, py + 10 - i * 6)
+            lado = Pt(l, px - 2 - i * 4, py - 2 - i * 6)
+            pygame.draw.polygon(tela, PALETA["k"], [base, ponta, lado])
+            pygame.draw.polygon(tela, (96, 98, 106), [base, ponta, lado], 0)
+        return
     for i in range(3):  # os tubos das costas
         a = Pt(l, px - 6 - i * 5, py - 2 + i * 3)
         b = Pt(l, px - 16 - i * 6, py + 12 + i * 2)
         pygame.draw.line(tela, PALETA["k"], a, b, max(3, int(3.4 * esc)))
-        pygame.draw.line(tela, (240, 240, 240) if branco else PALETA["X"], a, b, max(1, int(1.6 * esc)))
+        pygame.draw.line(tela, (240, 240, 240) if branco else cor("X"), a, b, max(1, int(1.6 * esc)))
 
 
 def desenha_segunda_boca(tela, l, p, esc, k):
@@ -174,7 +193,10 @@ def acido_acertou(dono, alvo, jogo, resultado):
 
 
 def todo_quadro(l, jogo):
-    """As poças: queimam quem estiver em cima (1 por segundo) e somem depois de 3 segundos."""
+    """As poças: queimam quem estiver em cima (1 por segundo) e somem depois de 3 segundos.
+    (E as passivas do Tromos: EMBOSCADA e REGENERAÇÃO.)"""
+    import habilidades
+    habilidades.tromos_quadro(l, jogo)
     pocas = l.extra.get("pocas")
     if not pocas:
         return
@@ -243,7 +265,8 @@ def rasteja(l, outro, jogo):
 # =====================================================================
 # Z: ULTIMATE — SEGUNDA BOCA
 # =====================================================================
-U_PULA, U_MORDIDAS, U_INTERVALO, U_DANO = 12, 5, 14, 7
+U_PULA, U_MORDIDAS, U_INTERVALO, U_DANO = 12, 5, 14, 5
+U_CURA = 3  # (pedido do Gomes: menos dano, mas cada mordida RECUPERA vida dele: 5 x 5 = 25, +15 de vida)
 U_SOLTA = 10 + U_MORDIDAS * U_INTERVALO
 
 
@@ -297,6 +320,11 @@ def devorar(l, outro, jogo, u):
             outro.levar(U_DANO, l, GOLPES["xeno_ultimate"])
             if not ultima:
                 outro.vida = max(1, outro.vida)
+            l.vida = min(l.vida_max, l.vida + U_CURA)  # a mordida cura o Xeno
+            l.vida_vista = max(l.vida_vista, l.vida)
+            m.setdefault("curas", []).append(u)
+            from max10 import fumaca
+            fumaca(jogo, l.x, l.y - 60 * l.s, 5, (120, 255, 140), 2, -1.5)
             outro.tremor_hit = 8
             m["boca"] = u
             jogo.tremer(7)
@@ -314,6 +342,20 @@ def devorar(l, outro, jogo, u):
             l.vx = 0
             if u > U_SOLTA + 20:
                 return "fim"
+
+
+def cura_efeito(l, tela):
+    """O '+3' verde subindo em cima do Xeno a cada mordida da SEGUNDA BOCA."""
+    m = l.memo
+    if "pegou" not in m:
+        return
+    u = l.t - m["pegou"]
+    from efeitos import texto_grande
+    for c in m.get("curas", []):
+        k = u - c
+        if 0 <= k < 30:
+            texto_grande(tela, f"+{U_CURA}", 22, (120, 255, 140), (int(l.x), int(l.y - (130 + k * 1.5) * l.s)),
+                         contorno=(10, 50, 20))
 
 
 def ultimate_quadros():
@@ -346,9 +388,9 @@ def _registra(nome, **g):
     GOLPES[nome] = g
 
 
-_registra("xeno_cospe", ini=10, ativo=1, rec=18, dano=8, hit=14, defe=8, emp=2, nivel="medio", ia="longe",
+_registra("xeno_cospe", ini=10, ativo=1, rec=18, dano=9, hit=14, defe=8, emp=2, nivel="medio", ia="longe",
           ao_usar=cospe, quadros=[(0, "parado"), (6, "x_cospe"), (20, "x_cospe"), (29, "parado")])
-_registra("xeno_acido", ini=0, ativo=1, rec=0, proj=True, varios=True, raio=9, vel=9, dano=8, hit=14, defe=8, emp=2,
+_registra("xeno_acido", ini=0, ativo=1, rec=0, proj=True, varios=True, raio=9, vel=9, dano=9, hit=14, defe=8, emp=2,
           nivel="medio", ao_acertar=acido_acertou)
 _registra("xeno_poca", ini=0, ativo=1, rec=0, dano=1, hit=0, defe=0, emp=0, nivel="medio", ia="longe")
 _registra("xeno_rabada", ini=12, ativo=8, rec=20, janelas=((12, 20),), caixa=(10, 0, 100, 120), dano=15, hit=20,
@@ -356,14 +398,14 @@ _registra("xeno_rabada", ini=12, ativo=8, rec=20, janelas=((12, 20),), caixa=(10
           quadros=[(0, "parado"), (8, "x_rabada"), (26, "x_rabada"), (40, "parado")])
 _registra("xeno_garras", ini=G_INI, ativo=G_HITS * G_INTERVALO, rec=12,
           janelas=tuple((G_INI + k * G_INTERVALO, G_INI + k * G_INTERVALO + 3) for k in range(G_HITS)),
-          caixa=(10, 30, 88, 112), dano=3, hit=10, defe=7, emp=1, nivel="medio", logica=garras, ia="perto",
+          caixa=(10, 30, 88, 112), dano=4, hit=10, defe=7, emp=1, nivel="medio", logica=garras, ia="perto",
           quadros=garras_quadros())
 _registra("xeno_rasteja", base="agachado", ini=R_INI, ativo=R_FIM - R_INI, rec=12, janelas=((R_INI, R_FIM),),
-          caixa=(0, 0, 64, 46), dano=6, hit=14, defe=8, emp=4, nivel="baixo", logica=rasteja, ia="medio", som="vento",
+          caixa=(0, 0, 64, 46), dano=8, hit=14, defe=8, emp=4, nivel="baixo", logica=rasteja, ia="medio", som="vento",
           quadros=[(0, "parado"), (R_INI - 1, "x_rasteja"), (R_FIM, "x_rasteja"), (R_FIM + 12, "parado")])
 _registra("xeno_ultimate", ini=U_PULA, ativo=40, rec=0, janelas=((U_PULA, U_PULA + 40),), dano=0, hit=40, defe=20,
           emp=0, nivel="medio", ultimate=True,
-          logica=ultimate, ia="ultimate", quadros=ultimate_quadros())
+          logica=ultimate, efeito=cura_efeito, ia="ultimate", quadros=ultimate_quadros())
 GOLPES["xeno_ultimate"]["total"] = 9999
 
 GOLPES_XENO = {"E": "xeno_cospe", "Q": "xeno_rabada", "R": "xeno_garras", "SHIFT": "xeno_rasteja",
@@ -403,14 +445,15 @@ TRONCO = Peca([
 ], PALETA, a=(6, 18), b=(6, 1))
 
 CABECA = Peca([
-    "....kkkkkk........",
-    "..kkxXXXXxkkk.....",
-    ".kxXsssXXXxxxkk...",
-    "kbxXXXXXXXXxxxxkk.",
-    ".kbbxxxxxxxxxyYxxk",
-    "..kkbbbxxxxxkkyxdk",
-    "....kkkbbbbkdkdkdk",
-    ".......kkkkkkkkkk.",
+    "....kkkkkk..........",
+    "..kkxXXXXxkkk.......",
+    ".kxXsssXXXxxxkk.....",
+    "kbxXXXXXXXXxxxxkkk..",
+    ".kbbxxxxxxxxxyYxxxkk",
+    "..kkbbbxxxxxkkyxxxbk",
+    "....kkkbbbbkdkdkdkbk",
+    ".......kkkkkkkkkkdkk",
+    ".................kk.",
 ], PALETA, a=(9, 4), b=(9, 0), estica=False)
 
 COXA = Peca([
@@ -486,7 +529,153 @@ MAO = Peca([
 ], PALETA, a=(2, 0), b=(2, 3), estica=False)
 
 
+# =====================================================================
+# INDOMINUS REX (roupa secreta do Xenomorph, código UNTAMABLE): um dinossauro desenhado inteiro,
+# em cima dos mesmos pontos da pose (a hitbox e os golpes são os mesmos do Xeno)
+# =====================================================================
+def desenhar_indominus(l, tela, p, branco):
+    s = l.s
+    pele, sombra, listra = (226, 224, 216), (182, 180, 172), (84, 86, 94)
+    barriga, borda, escuro = (242, 240, 232), (8, 8, 12), (150, 148, 140)
+    if branco:
+        pele = sombra = listra = barriga = escuro = (245, 245, 250)
+
+    def Q(pt):  # ponto da pose -> tela
+        return Pt(l, pt[0], pt[1])
+
+    def poly(pts, cor, contorno=True):
+        tela_pts = [Q(q) for q in pts]
+        if contorno:
+            pygame.draw.polygon(tela, borda, tela_pts)
+            meio = (sum(x for x, _ in tela_pts) / len(tela_pts), sum(y for _, y in tela_pts) / len(tela_pts))
+            k = max(0.0, 1 - 1.6 * s / max(8.0, max(abs(x - meio[0]) + abs(y - meio[1]) for x, y in tela_pts)))
+            pygame.draw.polygon(tela, cor, [(meio[0] + (x - meio[0]) * k, meio[1] + (y - meio[1]) * k)
+                                            for x, y in tela_pts])
+        else:
+            pygame.draw.polygon(tela, cor, tela_pts)
+
+    def osso(a, b, w1, w2, cor):  # um pedaço grosso (coxa, canela, pescoço...) de a até b
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        n = math.hypot(dx, dy) or 1
+        nx, ny = -dy / n, dx / n
+        poly([(a[0] + nx * w1, a[1] + ny * w1), (b[0] + nx * w2, b[1] + ny * w2),
+              (b[0] - nx * w2, b[1] - ny * w2), (a[0] - nx * w1, a[1] - ny * w1)], cor)
+
+    def mais_p(a, b, k):
+        return (a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k)
+
+    def bola(pt, r, cor, contorno=True):  # junta redonda (pra não ficar tudo quadrado)
+        c = Q(pt)
+        if contorno:
+            pygame.draw.circle(tela, borda, (int(c[0]), int(c[1])), max(2, int((r + 1.6) * s)))
+        pygame.draw.circle(tela, cor, (int(c[0]), int(c[1])), max(1, int(r * s)))
+
+    qd, pc, cb = p["qd"], p["pc"], p["cb"]
+
+    # a CAUDA grossa (mesmos pontos do rabo do Xeno), com listras
+    cauda = pontos_cauda(l, p)
+
+    def gomo(i, folga):  # um pedaço da cauda (folga > 0 = o contorno, um pouco maior)
+        a, b = cauda[i], cauda[i + 1]
+        w1, w2 = max(1.5, 11 - i * 0.8) + folga, max(1.2, 11 - (i + 1) * 0.8) + folga
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        n = math.hypot(dx, dy) or 1
+        nx, ny = -dy / n, dx / n
+        ex, ey = dx / n * folga * 0.5, dy / n * folga * 0.5  # (encosta no próximo: sem fresta)
+        return [Q((a[0] + nx * w1 - ex, a[1] + ny * w1 - ey)), Q((b[0] + nx * w2 + ex, b[1] + ny * w2 + ey)),
+                Q((b[0] - nx * w2 + ex, b[1] - ny * w2 + ey)), Q((a[0] - nx * w1 - ex, a[1] - ny * w1 - ey))]
+
+    for i in range(len(cauda) - 1):  # primeiro o contorno da cauda inteira, depois as cores (fica lisa)
+        pygame.draw.polygon(tela, borda, gomo(i, 1.6))
+    for i in range(len(cauda) - 1):
+        pygame.draw.polygon(tela, listra if i % 3 == 1 else pele, gomo(i, 0.3))
+
+    def perna(pe, joelho, cor):
+        tornozelo = (p[pe][0] - 2, p[pe][1] + 6)
+        bola(p[joelho], 5.5, cor)
+        osso(qd, p[joelho], 11, 6, cor)  # coxa forte
+        bola(qd, 10.5, cor, False)
+        osso(p[joelho], tornozelo, 5, 3, cor)
+        bola(p[joelho], 4.5, cor, False)
+        for k, dx in enumerate((10, 13, 9)):  # o pé com 3 garras
+            dedo = (tornozelo[0] + dx, p[pe][1] + (0 if k != 1 else 1))
+            osso(tornozelo, dedo, 2.4, 1.4, cor)
+            pygame.draw.line(tela, borda, Q(dedo), Q((dedo[0] + 3, dedo[1] - 1)), max(1, int(1.6 * s)))
+        osso((qd[0] + 2, qd[1] + 4), mais_p(qd, p[joelho], 0.5), 2, 1.5, listra)  # listra na coxa
+
+    def braco(cot, mao, cor):
+        ombro = (pc[0] - 2, pc[1] - 8)
+        cotovelo = mais_p(ombro, p[cot], 0.7)
+        punho = mais_p(cotovelo, p[mao], 0.55)
+        osso(ombro, cotovelo, 3, 2.4, cor)
+        osso(cotovelo, punho, 2.4, 1.6, cor)
+        for dy in (1.5, -1.5):  # 2 garras
+            pygame.draw.line(tela, borda, Q(punho), Q((punho[0] + 5, punho[1] + dy - 2)), max(1, int(1.6 * s)))
+
+    perna("pt", "jt", sombra)
+    braco("ct", "mt", sombra)
+    # o CORPO (do quadril até o peito)
+    dx, dy = pc[0] - qd[0], pc[1] - qd[1]
+    n = math.hypot(dx, dy) or 1
+    nx, ny = -dy / n, dx / n
+    corpo = [(qd[0] + nx * 14 - dx * 0.15, qd[1] + ny * 14 - dy * 0.15), (pc[0] + nx * 12, pc[1] + ny * 12),
+             (pc[0] + dx * 0.25, pc[1] + dy * 0.25), (pc[0] - nx * 11, pc[1] - ny * 11),
+             (qd[0] - nx * 12, qd[1] - ny * 12), (qd[0] - dx * 0.3, qd[1] - dy * 0.3)]
+    bola(qd, 13, pele)
+    bola(pc, 11.5, pele)
+    poly(corpo, pele)
+    bola(qd, 11.2, pele, False)  # (arredonda o quadril e o peito por cima das quinas)
+    bola(pc, 9.8, pele, False)
+    poly([(pc[0] - nx * 9, pc[1] - ny * 9), (qd[0] - nx * 9, qd[1] - ny * 9),
+          (qd[0] - nx * 4, qd[1] - ny * 4), (pc[0] - nx * 4, pc[1] - ny * 4)], barriga, False)  # a barriga clara
+    for k in (0.15, 0.4, 0.65, 0.9):  # as listras escuras nas costas
+        a = (qd[0] + dx * k + nx * 13, qd[1] + dy * k + ny * 13)
+        b = (qd[0] + dx * (k - 0.12) + nx * 3, qd[1] + dy * (k - 0.12) + ny * 3)
+        osso(a, b, 1.8, 0.8, listra)
+    # o PESCOÇO e a CABEÇA (com a boca que abre na mordida e no ultimate)
+    bola((cb[0] - 2, cb[1]), 7.5, pele)
+    osso((pc[0] + 2, pc[1] + 2), (cb[0] - 2, cb[1]), 9, 7.5, pele)
+    bola((pc[0] + 2, pc[1] + 2), 8.4, pele, False)
+    abre = boca_k(l) * 8 + (5 if l.estado == "ataque" and l.nome_golpe in ("xeno_cospe", "xeno_garras") else 0)
+    hx, hy = cb
+    cabeca = [(hx - 7, hy + 3), (hx - 5, hy + 7), (hx - 1, hy + 9.5), (hx + 6, hy + 10.5), (hx + 12, hy + 9.5),
+              (hx + 18, hy + 7), (hx + 23, hy + 5), (hx + 27, hy + 3.2), (hx + 29.5, hy + 1.2), (hx + 29.5, hy - 0.4),
+              (hx + 27, hy - 1.2), (hx + 4, hy - 1.2), (hx - 4, hy - 2.6), (hx - 7, hy - 1)]  # (crânio arredondado)
+    queixo = [(hx - 2, hy - 1), (hx + 26, hy - 2 - abre * 0.4), (hx + 25.5, hy - 4 - abre * 0.8),
+              (hx + 22, hy - 6 - abre), (hx + 10, hy - 7.5 - abre * 0.6), (hx + 2, hy - 6.5 - abre * 0.3),
+              (hx - 2, hy - 4)]
+    poly(queixo, sombra)
+    for i in range(5):  # dentes de baixo
+        x = hx + 6 + i * 4
+        pygame.draw.polygon(tela, (250, 250, 240), [Q((x, hy - 2 - abre * 0.4 * (i / 5))),
+                                                    Q((x + 2, hy - 2 - abre * 0.4 * (i / 5))),
+                                                    Q((x + 1, hy + 1 - abre * 0.4 * (i / 5)))])
+    poly(cabeca, pele)
+    for i in range(6):  # dentes de cima
+        x = hx + 5 + i * 4
+        pygame.draw.polygon(tela, (250, 250, 240), [Q((x, hy - 1)), Q((x + 2, hy - 1)), Q((x + 1, hy - 4))])
+    poly([(hx + 4, hy + 9.6), (hx + 9, hy + 12.4), (hx + 15, hy + 9.6), (hx + 10, hy + 10.6)], listra)  # crista
+    for i in range(3):  # listras na cabeça
+        osso((hx - 4 + i * 5, hy + 7), (hx - 1 + i * 5, hy + 2), 1, 0.6, listra)
+    olho = Q((hx + 12, hy + 5))
+    pygame.draw.circle(tela, borda, (int(olho[0]), int(olho[1])), max(2, int(2.6 * s)))
+    pygame.draw.circle(tela, (240, 240, 240) if branco else (230, 30, 30), (int(olho[0]), int(olho[1])),
+                       max(1, int(1.8 * s)))
+    pygame.draw.circle(tela, borda, (int(olho[0] + 0.6 * s), int(olho[1])), max(1, int(0.8 * s)))
+    # os espinhos (osteodermos) nas costas, do pescoço até a cauda
+    ux, uy = dx / n, dy / n  # (ao longo das costas)
+    for k in range(6):  # cada espinho sai pra FORA das costas (na direção da curva), inclinado pra trás
+        b = mais_p((pc[0] + nx * 10.5, pc[1] + ny * 10.5), (qd[0] + nx * 12.5, qd[1] + ny * 12.5), k / 5)
+        alto = 6.5 - abs(k - 2.5) * 0.9
+        poly([(b[0] + ux * 2.6, b[1] + uy * 2.6), (b[0] + nx * alto - ux * 2.2, b[1] + ny * alto - uy * 2.2),
+              (b[0] - ux * 2.6, b[1] - uy * 2.6)], escuro)
+    perna("pf", "jf", pele)
+    braco("cf", "mf", pele)
+
+
 def desenhar_xeno(l, tela, p, branco):
+    if l.f.get("estilo") == "indominus":  # INDOMINUS REX: o desenho inteiro é outro (a hitbox não muda)
+        return desenhar_indominus(l, tela, p, branco)
     esc = l.s / S_REF
     d = l.lado()
     espelho = d < 0
@@ -521,7 +710,13 @@ def desenhar_xeno(l, tela, p, branco):
     pygame.draw.line(tela, PALETA["k"], c, cb, max(3, int(5 * esc)))
     pygame.draw.line(tela, (240, 240, 240) if branco else PALETA["x"], c, pescoco, max(1, int(3 * esc)))
     cima = Pt(l, p["cb"][0] - 3, p["cb"][1] + 10)  # a cabeça fica deitada pra frente (comprida)
-    CABECA.desenhar(tela, cb, cima, esc, espelho, perto_v)
+    na_cabeca = CABECA.desenhar(tela, cb, cima, esc, espelho, perto_v)
+    if l.f.get("estilo") == "indominus" and not branco:  # INDOMINUS: os chifrinhos em cima do olho
+        for x0 in (11.0, 13.2):
+            pts = [na_cabeca(x0, 3.6), na_cabeca(x0 + 1.2, 1.6), na_cabeca(x0 + 1.8, 3.6)]
+            pygame.draw.polygon(tela, PALETA["k"], pts)
+            pygame.draw.polygon(tela, (96, 98, 106), [na_cabeca(x0 + 0.4, 3.4), na_cabeca(x0 + 1.2, 2.2),
+                                                      na_cabeca(x0 + 1.5, 3.4)])
     k = boca_k(l)
     if k > 0.05:
         desenha_segunda_boca(tela, l, p, esc, k)

@@ -23,13 +23,16 @@ from loja import TelaLoja
 
 # o menu em 2 colunas: as lutas na esquerda, o resto na direita
 # (ARCADE e CPU x CPU saíram do menu: pedido do Gomes, "ninguém quer assistir PC batalhando")
-MODOS = ["1 JOGADOR", "2 JOGADORES", "TRIO", "TORNEIO", "ONLINE", "SOBREVIVÊNCIA", "MODOS MALUCOS",
-         "MODO TREINO", "COMBOS", "LOJA", "DESAFIOS", "CÓDIGOS", "COMO JOGAR", "SAIR"]
-POR_COLUNA = 7
-(UM, DOIS, TRIO, TORNEIO, ONLINE, SOBREV, MALUCOS, TREINO, COMBOS, LOJA, DESAFIOS, CODIGOS, COMOJOGAR) = range(13)
+MODOS = ["1 JOGADOR", "2 JOGADORES", "REI DA ARENA", "TRIO", "TORNEIO", "ONLINE", "SOBREVIVÊNCIA", "MODOS MALUCOS",
+         "MODO TREINO", "COMBOS", "LOJA", "DESAFIOS", "CÓDIGOS", "COMO JOGAR", "PERFIL", "CONFIGURAÇÕES", "SAIR"]
+if __import__("eventos").tem_conteudo() == "HALLOWEEN":  # EVENTO: o PASSE aparece no menu (antes do SAIR)
+    MODOS.insert(len(MODOS) - 1, "PASSE DO HALLOWEEN")
+POR_COLUNA = 9
+(UM, DOIS, REI, TRIO, TORNEIO, ONLINE, SOBREV, MALUCOS, TREINO, COMBOS, LOJA, DESAFIOS, CODIGOS, COMOJOGAR,
+ PERFIL, CONFIG) = range(16)
 ARCADE, CPU = -1, -2  # (fora do menu: o código deles ficou guardado)
-COM_REGRAS = (UM, DOIS, TRIO, TORNEIO, CPU, TREINO)  # onde os MODOS MALUCOS valem
-PAUSA = ["CONTINUAR", "RECOMEÇAR", "MENU PRINCIPAL"]
+COM_REGRAS = (UM, DOIS, REI, TRIO, TORNEIO, CPU, TREINO)  # onde os MODOS MALUCOS valem
+PAUSA = ["CONTINUAR", "MODO FOTO", "RECOMEÇAR", "MENU PRINCIPAL"]
 SOBREV_VOLTA = 30  # quanto de vida volta entre uma luta e outra na Sobrevivência
 COM_NIVEL = (UM, CPU, TRIO, TORNEIO)  # modos que têm dificuldade
 NIVEIS = list(Computador.NIVEIS)
@@ -37,6 +40,7 @@ NIVEIS = list(Computador.NIVEIS)
 class Jogo:
     def __init__(self):
         pygame.init()
+        som.aplicar_volumes()  # (os volumes das CONFIGURAÇÕES)
         # SCALED: a tela cresce junto quando fica em tela cheia (F11), sem borrar a pixel art
         try:
             self.tela = pygame.display.set_mode((LARGURA, ALTURA), pygame.SCALED)
@@ -64,6 +68,9 @@ class Jogo:
         self.opcao_pausa = 0
         self.lista = PERSONAGENS
         save.carregar()
+        import eventos
+        self.doces_viraram = eventos.converter_sobras()  # o Halloween acabou: os doces que sobraram viram moedas
+        self.doces_viraram_t = 400 if self.doces_viraram else 0
         controle_video.iniciar()
 
     # ------------------------------------------------------------ telas
@@ -118,12 +125,28 @@ class Jogo:
                 from como_jogar import TelaComoJogar
                 self.tcomo = TelaComoJogar()
                 self.tela_atual = "como"
+            elif MODOS[self.modo].startswith("PASSE DO"):
+                from passe import TelaPasse
+                self.tpasse = TelaPasse()
+                self.tela_atual = "passe"
+            elif self.modo == PERFIL:
+                from perfil import TelaPerfil
+                self.tperfil = TelaPerfil()
+                self.tela_atual = "perfil"
+            elif self.modo == CONFIG:
+                from configuracoes import TelaConfiguracoes
+                self.tconfig = TelaConfiguracoes()
+                self.tela_atual = "config"
             elif self.modo == CODIGOS:
                 from codigos import TelaCodigos
                 self.tcodigos = TelaCodigos()
                 self.tela_atual = "codigos"
-            elif self.modo == DOIS and not controle_video.CONTROLES:
+            elif self.modo in (DOIS, REI) and not controle_video.CONTROLES:
                 self.aviso_t = 180  # precisa de um controle pro jogador 2
+            elif self.modo == REI:  # REI DA ARENA: os nomes da turma
+                import reiarena
+                self.tnomes = reiarena.TelaNomes(getattr(self, "rei_nomes", None))
+                self.tela_atual = "rei_nomes"
             else:
                 self.lista = disponiveis()  # (com os secretos desbloqueados)
                 self.sel = TelaSelecao(self.lista, so_um=self.modo in (TREINO, ARCADE, SOBREV, COMBOS, TORNEIO),
@@ -162,6 +185,9 @@ class Jogo:
             self.escolhendo = 1
             self.tela_atual = "cor"
         else:  # agora o cenário (começa na casa do adversário)
+            if self.modo == REI:  # (lembra o lutador de cada um)
+                rei, desafiante = self.arena.proxima_luta()
+                self.arena.lutador[rei], self.arena.lutador[desafiante] = self.escolha[0], self.escolha[1]
             self.tcen = TelaCenario(self.lista[self.escolha[1]].get("cenario", "TEMPLO"))
             self.tela_atual = "cenario"
 
@@ -220,10 +246,25 @@ class Jogo:
 
     def desenhar_titulo(self):
         t = self.tela
-        t.blit(self.fundo, (0, 0))
+        import eventos
+        if not eventos.desenhar_menu(t, self.t_menu):  # (EVENTO: o fundo de Halloween, com a aranhinha)
+            t.blit(self.fundo, (0, 0))
+        if not hasattr(self, "vitrine"):  # o LUTADOR FAVORITO lutando contra a sombra dele, atrás das opções
+            import vitrine
+            self.vitrine = vitrine.Vitrine()
+        self.vitrine.passo()
+        self.vitrine.desenhar(t)
         logo(t, (LARGURA // 2, 80), 0.58, self.t_menu)
         self.t_menu += 1
         texto_moedas(t, save.moedas(), LARGURA - 22, 26, self.t_menu, 22)
+        if eventos.tem_conteudo() == eventos.HALLOWEEN:  # o saldo de DOCES
+            from efeitos import doce
+            doce(t, (LARGURA - 92, 74), 8, self.t_menu)
+            texto(t, f"{eventos.doces()} doces", 15, (255, 160, 60), (LARGURA - 44, 74))
+        if self.doces_viraram_t > 0:
+            self.doces_viraram_t -= 1
+            texto(t, f"O Halloween acabou: seus {self.doces_viraram // eventos.MOEDAS_POR_DOCE} doces viraram "
+                     f"{self.doces_viraram} moedas!", 18, (255, 170, 70), (LARGURA // 2, 140))
         if save.recorde():
             texto(t, f"recorde da Sobrevivência: {save.recorde()}", 13, (220, 220, 230), (LARGURA - 120, 52))
         for i, m in enumerate(MODOS):
@@ -331,7 +372,7 @@ class Jogo:
             return
         c1 = Computador(nivel) if self.modo == CPU else Jogador()
         c2 = Computador(nivel)
-        if self.modo == DOIS:  # 2 JOGADORES: o 1 no teclado e mouse (e no 1º controle, se tiver dois), o 2 no controle
+        if self.modo in (DOIS, REI):  # 2 JOGADORES: o 1 no teclado e mouse (e no 1º controle, se tiver dois), o 2 no controle
             cs = controle_video.CONTROLES
             c1 = Jogador(controle=cs[0] if len(cs) >= 2 else None)
             c2 = Jogador(controle=cs[-1] if cs else None, teclado=False)
@@ -346,6 +387,43 @@ class Jogo:
         else:
             self.creditos = Creditos()
             self.tela_atual = "creditos"
+
+    # ------------------------------------------------------------ REI DA ARENA
+    def evento_rei(self, ev):
+        import reiarena
+        if ev.type == pygame.KEYDOWN and ev.key == pygame.K_F11:
+            pygame.display.toggle_fullscreen()
+            return
+        if self.tela_atual == "rei_nomes":
+            t = self.tnomes
+            if ev.type == pygame.KEYDOWN:
+                t.tecla(ev)
+            elif ev.type in (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN):
+                t.mouse(ev.pos, ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1)
+            if t.sair:
+                self.tela_atual = "titulo"
+            elif t.pronto:
+                self.rei_nomes = list(t.nomes)
+                self.arena = reiarena.ReiArena(t.nomes)
+                self.tplacar = reiarena.TelaPlacar(self.arena)
+                self.tela_atual = "rei_placar"
+            return
+        t = self.tplacar
+        if ev.type == pygame.KEYDOWN:
+            t.tecla(ev.key)
+        elif ev.type in (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN):
+            t.mouse(ev.pos, ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1)
+        if t.sair:
+            self.tela_atual = "titulo"
+        elif t.continuar:  # próxima luta: escolhem os lutadores (já no último que cada um usou)
+            rei, desafiante = self.arena.proxima_luta()
+            self.lista = disponiveis()
+            self.sel = TelaSelecao(self.lista, rotulo2="2P", titulo=f"REI: {rei}   x   DESAFIANTE: {desafiante}")
+            for lado, nome in enumerate((rei, desafiante)):
+                i = self.arena.lutador.get(nome)
+                if i is not None and i < len(self.lista):
+                    self.sel.cursor[lado] = i
+            self.tela_atual = "escolha"
 
     # ------------------------------------------------------------ pausa
     def rect_pausa(self, i):
@@ -365,6 +443,15 @@ class Jogo:
             if escolha == "CONTINUAR":
                 if isinstance(self.partida.ctrl[0], Jogador):  # o clique do menu não vira soco
                     self.partida.ctrl[0].antes = {"soco": True, "chute": True}
+            elif escolha == "MODO FOTO":  # a luta congelada: câmera, zoom, filtro e salva PNG
+                import foto
+                sem_hud = pygame.Surface((LARGURA, ALTURA))
+                self.partida.desenhar_luta(sem_hud)
+                com_hud = pygame.Surface((LARGURA, ALTURA))
+                self.partida.desenhar(com_hud)
+                self.tfoto = foto.TelaFoto(sem_hud, com_hud)
+                self.pausado = True
+                self.tela_atual = "foto"
             elif escolha == "RECOMEÇAR":
                 self.comecar()
             else:
@@ -462,6 +549,18 @@ class Jogo:
                     if self.tela_atual == "online":
                         self.online.voltar_menu()  # avisa o amigo que saiu
                     self.sair()
+                if self.tela_atual in ("rei_nomes", "rei_placar"):  # REI DA ARENA (as telas cuidam das teclas)
+                    self.evento_rei(ev)
+                    continue
+                if self.tela_atual == "foto":  # MODO FOTO: ele cuida de tudo (ESC volta pra pausa)
+                    if ev.type == pygame.KEYDOWN and ev.key == pygame.K_F11:
+                        pygame.display.toggle_fullscreen()
+                    else:
+                        self.tfoto.evento(ev)
+                    if self.tfoto.sair:
+                        self.tela_atual = "luta"
+                        self.pausado = True
+                    continue
                 if self.tela_atual == "online":  # o modo online cuida das próprias teclas
                     if ev.type == pygame.KEYDOWN and ev.key == pygame.K_F11:
                         pygame.display.toggle_fullscreen()
@@ -474,6 +573,12 @@ class Jogo:
                     self.tcen.mouse(ev.pos, False)
                 if ev.type == pygame.MOUSEMOTION and self.tela_atual == "loja":
                     self.loja.mouse(ev.pos, False)
+                if ev.type == pygame.MOUSEMOTION and self.tela_atual == "config":
+                    self.tconfig.mouse(ev.pos, False)
+                if ev.type == pygame.MOUSEMOTION and self.tela_atual == "perfil":
+                    self.tperfil.mouse(ev.pos, False)
+                if ev.type == pygame.MOUSEMOTION and self.tela_atual == "passe":
+                    self.tpasse.mouse(ev.pos, False)
                 if ev.type == pygame.MOUSEMOTION and self.tela_atual == "titulo":
                     for i in range(len(MODOS)):
                         if self.rect_modo(i).collidepoint(ev.pos):
@@ -488,6 +593,12 @@ class Jogo:
                             self.pausa("clique")
                     elif self.tela_atual == "loja":
                         self.loja.mouse(ev.pos, True)
+                    elif self.tela_atual == "config":
+                        self.tconfig.mouse(ev.pos, True)
+                    elif self.tela_atual == "perfil":
+                        self.tperfil.mouse(ev.pos, True)
+                    elif self.tela_atual == "passe":
+                        self.tpasse.mouse(ev.pos, True)
                     elif self.tela_atual == "abertura":
                         self.tela_atual = "titulo"
                     elif self.tela_atual == "titulo":
@@ -526,6 +637,9 @@ class Jogo:
                 if self.tela_atual == "luta" and self.pausado:
                     self.pausa(ev.key)
                     continue
+                if ev.key == pygame.K_ESCAPE and self.tela_atual == "perfil" and getattr(self.tperfil, "album", None):
+                    self.tperfil.album = None  # (no ÁLBUM, o ESC volta pro perfil)
+                    continue
                 if ev.key == pygame.K_ESCAPE:
                     if self.tela_atual == "titulo":
                         self.sair()
@@ -547,6 +661,12 @@ class Jogo:
                     self.loja.tecla(ev.key)
                 elif self.tela_atual == "codigos":
                     self.tcodigos.tecla(ev)
+                elif self.tela_atual == "config":
+                    self.tconfig.tecla(ev.key)
+                elif self.tela_atual == "perfil":
+                    self.tperfil.tecla(ev.key)
+                elif self.tela_atual == "passe":
+                    self.tpasse.tecla(ev.key)
                 elif self.tela_atual == "malucos":
                     self.tmalucos.tecla(ev.key)
                 elif self.tela_atual == "torneio" and ev.key in (pygame.K_RETURN, pygame.K_SPACE):
@@ -576,13 +696,23 @@ class Jogo:
                     self.partida.ver_caixas = not getattr(self.partida, "ver_caixas", False)
                     som.tocar("blip")
                 elif self.tela_atual == "luta" and ev.key == pygame.K_p:  # TESTE: enche a barra da ultimate
-                    self.partida.L[0].barra = BARRA_MAX
+                    self.partida.L[0].barra = BARRA_TOTAL if self.partida.L[0].tem_ult2() else BARRA_MAX
                 elif self.tela_atual == "luta" and self.partida.treino and pygame.K_1 <= ev.key <= pygame.K_5:
                     self.partida.ctrl[1].modo = BonecoTreino.MODOS[ev.key - pygame.K_1]
-                elif self.tela_atual == "luta" and self.partida.fase == "entrada" and ev.key == pygame.K_RETURN:
-                    self.partida.tf = DURACAO_ENTRADA  # pula a entrada
+                elif (self.tela_atual == "luta" and self.partida.fase in ("entrada", "falas")
+                      and ev.key == pygame.K_RETURN):
+                    self.partida.pular_entrada()  # pula a entrada (e as falas)
+                elif (self.tela_atual == "luta" and self.partida.fase == "fim" and ev.key == pygame.K_RETURN
+                      and self.partida.replay_tocando()):
+                    self.partida.pular_replay()  # (ENTER no replay só pula o replay)
                 elif self.tela_atual == "luta" and self.partida.fase == "fim" and ev.key == pygame.K_RETURN:
-                    if self.modo == TORNEIO:  # volta pra chave com o resultado
+                    if self.modo == REI:  # REI DA ARENA: quem ganha fica, quem perde vai pro fim da fila
+                        import reiarena
+                        self.arena.registrar(self.partida.vencedor)
+                        self.tplacar = reiarena.TelaPlacar(self.arena)
+                        self.tela_atual = "rei_placar"
+                        som.musica("menu")
+                    elif self.modo == TORNEIO:  # volta pra chave com o resultado
                         p = self.partida
                         venceu = p.vencedor == 0 or (p.vencedor == "empate" and p.L[0].vida >= p.L[1].vida)
                         if getattr(p, "assistindo", False):  # computadores: a esquerda é a "a" da chave
@@ -630,6 +760,18 @@ class Jogo:
                 self.tmalucos.desenhar(self.tela)
             elif self.tela_atual == "como":
                 self.tcomo.desenhar(self.tela)
+            elif self.tela_atual == "passe":
+                self.tpasse.desenhar(self.tela)
+                if self.tpasse.sair:
+                    self.tela_atual = "titulo"
+            elif self.tela_atual == "perfil":
+                self.tperfil.desenhar(self.tela)
+                if self.tperfil.sair:
+                    self.tela_atual = "titulo"
+            elif self.tela_atual == "config":
+                self.tconfig.desenhar(self.tela)
+                if self.tconfig.sair:
+                    self.tela_atual = "titulo"
             elif self.tela_atual == "torneio":
                 self.torneio.desenhar(self.tela)
             elif self.tela_atual == "desafios":
@@ -640,6 +782,14 @@ class Jogo:
                 self.creditos.desenhar(self.tela)
                 if self.creditos.acabou:
                     self.tela_atual = "titulo"
+            elif self.tela_atual == "rei_nomes":
+                self.tnomes.desenhar(self.tela)
+            elif self.tela_atual == "rei_placar":
+                self.tplacar.desenhar(self.tela)
+            elif self.tela_atual == "foto":
+                self.acumulado = 0
+                self.tfoto.segurando(pygame.key.get_pressed())
+                self.tfoto.desenhar(self.tela)
             elif self.tela_atual == "vs":
                 self.vs.desenhar(self.tela)
                 if self.vs.acabou:
@@ -679,6 +829,10 @@ class Jogo:
                     self.acumulado = 0
                 try:
                     self.partida.desenhar(self.tela)
+                    if self.modo == REI and self.partida.fase not in ("fim",):  # a coroa em cima do REI
+                        import reiarena
+                        rei = self.partida.L[0]
+                        reiarena.desenhar_coroa(self.tela, int(rei.x), int(rei.y - 150 * rei.s), self.partida.t_total, 0.8)
                 except pygame.error:  # faltou memória num quadro: pula esse desenho e segue a luta
                     gc.collect()
             pygame.display.flip()

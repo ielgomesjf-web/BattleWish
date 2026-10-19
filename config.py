@@ -26,6 +26,7 @@ MOUSE_SOCO, MOUSE_ARMAR, MOUSE_CHUTE = 1, 2, 3
 # (o golpe de cada botão depende do personagem, veja personagens.py)
 ESPECIAIS = {pygame.K_e: "E", pygame.K_q: "Q", pygame.K_r: "R", pygame.K_LSHIFT: "SHIFT", pygame.K_RSHIFT: "SHIFT"}
 ULTIMATE = pygame.K_z
+ULTIMATE2 = pygame.K_c     # M3 + C = 2ª ULTIMATE (com a barra AMARELA cheia)
 JANELA_M3 = 12              # 0,2 segundo depois de soltar a rodinha (pedido do Gomes)
 DUPLO_M3 = 15               # TOQUE E SEGURA a rodinha (clique duplo) em até 0,25 s = EX (e, apanhando, ESCAPE)
 
@@ -41,6 +42,11 @@ DEFESA_DANO = 0.2           # defender um golpe normal ainda tira 20% do dano
 DEFESA_DANO_ESPECIAL = 0.25 # ...e um especial, 25%
 
 # ---- parry: tocar pra FRENTE (ou pra BAIXO, contra golpe baixo) bem na hora ----
+ROLA_JANELA = 3             # ROLAMENTO: M1 e M2 com até 3 quadros de diferença = rola
+ROLA_TEMPO = 24             # quadros rolando
+ROLA_INV = 14               # quadros invencível no começo do rolamento
+ROLA_VEL = 8.5
+ROLA_ESPERA = 30            # depois de rolar, espera isso pra rolar de novo
 PARRY_JANELA = 8            # quadros que o parry fica ligado depois do toque
 PARRY_TRAVA = 22            # errou o tempo: espera isso pra poder tentar de novo
 PARRY_PARADA = 16           # quadros que tudo congela quando dá parry
@@ -50,9 +56,15 @@ PULO_PERSEGUE = 20          # pulo atrás de quem foi jogado pra cima (aperta CI
 BUFFER_BOTAO = 8            # soco/chute apertado até 8 quadros antes ainda vale
 
 # ---- barra do ultimate ----
-BARRA_MAX = 1000
+BARRA_MAX = 1000           # a parte AZUL (1ª ultimate)
+BARRA_AMARELA = 500        # a parte AMARELA (metade do tamanho): cheia = 2ª ULTIMATE
+BARRA_TOTAL = BARRA_MAX + BARRA_AMARELA
+BONUS_COMBO = 100          # (só com a azul cheia) combo de 5+ golpes enche a amarela
+BONUS_CHOQUE = 120         # ...vencer um choque
+BONUS_OBJETO = 80          # ...usar o objeto do cenário
 BARRA_BATER = 16            # quanto enche por ponto de dano que você dá
 BARRA_APANHAR = 10          # quanto enche por ponto de dano que você leva
+ULT2_PAUSA = 84             # 2ª ULTIMATE: a apresentação (faixa dourada com o nome) fica mais tempo
 ULTIMATE_PAUSA = 36         # quadros com a tela escura antes do ultimate sair
 
 BRANCO = (255, 255, 255)
@@ -78,7 +90,7 @@ PROVOCA_TEMPO = 70         # quadros parado provocando
 PROVOCA_BARRA = 120        # quanto enche da barra da ultimate (de 1000) se não apanhar
 
 # ---- online ----
-VERSAO = "2026.10.16c"      # os dois PCs precisam da mesma versão (o online confere)
+VERSAO = "2.0"      # os dois PCs precisam da mesma versão (o online confere)
 
 # ---- botão de BARRA (F no teclado, LT no controle) ----
 BARRA_TECLA = pygame.K_f

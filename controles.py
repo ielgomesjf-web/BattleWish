@@ -5,6 +5,8 @@ import pygame
 
 from config import *  # noqa: F401,F403
 from golpes import GOLPES
+import habilidades as hab
+from ult2 import VEEM_NO_ESCURO
 from lutador import PADRAO, Entrada
 
 
@@ -37,7 +39,7 @@ class Jogador:
         # só conta no quadro em que aperta (segurar não fica socando)
         agora = {"soco": mouse[MOUSE_SOCO - 1], "chute": mouse[MOUSE_CHUTE - 1], ULTIMATE: keys[ULTIMATE],
                  PROVOCA: keys[PROVOCA], BARRA_TECLA: keys[BARRA_TECLA], TROCA_TECLA: keys[TROCA_TECLA],
-                 pygame.K_x: keys[pygame.K_x]}
+                 pygame.K_x: keys[pygame.K_x], ULTIMATE2: keys[ULTIMATE2]}
         for k in ESPECIAIS:
             agora[k] = keys[k]
         novo = {k: bool(a) and not self.antes.get(k) for k, a in agora.items()}
@@ -62,8 +64,10 @@ class Jogador:
         if not self.armado:
             self.ex_armado = False
         ex_agora = self.ex_armado  # (guardado antes do especial "gastar" a rodinha)
+        if getattr(jogo, "choque", None):  # CHOQUE: nenhum especial fica guardado pra sair depois
+            self.armado = self.guardado_t = 0
         if self.armado:
-            esp = "Z" if novo[ULTIMATE] else next((n for k, n in ESPECIAIS.items() if novo[k]), None)
+            esp = "Z" if novo[ULTIMATE] else "Z2" if novo[ULTIMATE2] else next((n for k, n in ESPECIAIS.items() if novo[k]), None)
             if esp:
                 self.armado = 0
                 self.guardado, self.guardado_t = esp, 8
@@ -112,6 +116,9 @@ class Jogador:
         return e
 
 
+PARRY_BOT_ESPERA = 180  # o computador tenta parry no máximo 1 vez a cada 3 segundos
+
+
 class Computador:
     # (chance de defender quando vê o golpe, quadros parado pensando, tempo de reação em quadros)
     # O tempo de reação é como o de gente: soco e chute rápidos chegam antes dela conseguir reagir.
@@ -126,7 +133,8 @@ class Computador:
         self.nivel = nivel
         self.usou = {}         # botão de especial -> quadro em que usou por último
         self.relogio = 0
-        self.parry = {"FÁCIL": 0.0, "MÉDIO": 0.08, "DIFÍCIL": 0.25}[nivel]
+        self.parry = {"FÁCIL": 0.0, "MÉDIO": 0.04, "DIFÍCIL": 0.12}[nivel]  # (o Gomes: "o bot dá MUITO parry")
+        self.parry_espera = 0  # depois de tentar um parry, espera um tempo pra tentar de novo
         self.plano = []
         self.espera = 0
         self.segurando = 5
@@ -139,8 +147,14 @@ class Computador:
 
     ESCAPE = {"FÁCIL": 0.0, "MÉDIO": 0.02, "DIFÍCIL": 0.06}  # chance (por quadro) de escapar de um combo longo
 
+    # CHOQUE: chance de apertar por quadro (uma criança clica uns 6-8 por segundo = 0,10-0,13 por quadro)
+    APERTA_CHOQUE = {"FÁCIL": 0.08, "MÉDIO": 0.11, "DIFÍCIL": 0.14}
+
     def ler(self, keys, eu, ele, jogo):
         self.relogio += 1
+        self.parry_espera -= 1
+        if getattr(jogo, "choque", None):  # CHOQUE: aperta botão o mais rápido que der
+            return Entrada(5, random.random() < self.APERTA_CHOQUE.get(self.nivel, 0.15))
         g_dele = ele.golpe if ele.estado == "ataque" else None
         no_normal = g_dele is not None and not g_dele.get("especial")  # (escapar NO MEIO de especial é paia: só de soco/chute)
         if (eu.estado in ("golpeado", "voando") and ele.combo >= 4 and eu.barra >= ESCAPE_CUSTO and no_normal
@@ -192,15 +206,19 @@ class Computador:
             visto = (ele.nome_golpe, jogo.tf - ele.t)  # este golpe, que começou neste quadro
         if visto is not None and visto != self.ja_pensou and livre:
             self.ja_pensou = visto
-            chance = self.chance * (0.25 if getattr(ele, "invisivel", 0) > 0 else 1)  # invisível: quase não vê
+            ve_tudo = "eletro" in hab.ativas(eu)  # ELETRORRECEPÇÃO: vê até quem está invisível
+            chance = self.chance * (0.25 if getattr(ele, "invisivel", 0) > 0 and not ve_tudo else 1)  # invisível: quase não vê
+            if ele.extra.get("cacada", 0) > 0 and eu.f.get("nome_base", eu.f["nome"]) not in VEEM_NO_ESCURO:
+                chance *= 0.4  # CAÇADA NO ESCURO: quase não vê o Tromos
             if random.random() >= chance:
                 return Entrada(self.segurando)  # não deu tempo / não viu
         else:
             bola = ataque = carregando = False
         if livre and (bola or ataque or carregando):
-            if ataque and random.random() < self.parry:  # tenta o parry: toca pra frente na hora
+            if ataque and self.parry_espera <= 0 and random.random() < self.parry:  # tenta o parry
+                self.parry_espera = PARRY_BOT_ESPERA
                 baixo = ele.golpe["nivel"] == "baixo"
-                falta = max(0, ele.golpe["ini"] - ele.t - 3)
+                falta = max(0, ele.golpe["ini"] - ele.t - 3 + random.randint(-4, 4))  # às vezes erra o tempo
                 self.plano = [(5, None)] * falta + [(2 if baixo else frente, None)] + [(5, None)] * 10
             elif (bola or carregando) and random.random() < 0.3:
                 self.plano = [(frente + 3, None)] + [(5, None)] * 14 + [(5, "c")]  # pula por cima
@@ -224,7 +242,9 @@ class Computador:
 
         if not livre:
             return Entrada(5)
-        if eu.barra >= BARRA_MAX and dist < 600 and random.random() < 0.3:
+        if eu.barra >= BARRA_TOTAL and eu.tem_ult2() and dist < 600 and random.random() < 0.3:
+            return Entrada(5, especial="Z2")  # 2ª ULTIMATE (a amarela encheu)
+        if eu.barra >= BARRA_MAX and dist < 600 and random.random() < (0.15 if eu.tem_ult2() else 0.3):  # (às vezes espera a amarela)
             return esp("ultimate")
         x = random.random()
         if dist > 280:

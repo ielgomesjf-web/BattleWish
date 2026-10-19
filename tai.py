@@ -5,8 +5,8 @@ Aparência: grandão, cinto de sumô (mawashi) azul-marinho, coque no cabelo. Ma
   Q      AGARRA e arremessa pro alto (20) — agarrão não dá pra defender
   R      TAPAS de sumô: 8 tapas de 2
   SHIFT  INVESTIDA de barriga (12): empurra o oponente até a parede
-  Z      ULTIMATE: YOKOZUNA — agarra, levanta, pula e cai SENTADO em cima (40)
-  Passiva: PESO PESADO — 120 de vida e soco/chute normal não fazem ele recuar (mas é o mais lento)
+  Z      ULTIMATE: YOKOZUNA — agarra, levanta, pula e cai SENTADO em cima (30; DÁ PRA DEFENDER, remodel do Gomes)
+  Passiva: FÚRIA DO SUMÔ (remodel) — levou 5 golpes no mesmo combo: +25% de dano por 5 s (de vez em quando)
 """
 import math
 import random
@@ -169,7 +169,7 @@ def investida(l, outro, jogo):
 # Z: ULTIMATE — YOKOZUNA
 # =====================================================================
 U_PEGA, U_LEVANTA, U_PULA, U_SOLTA = 10, 22, 26, 38
-U_DANO = 40
+U_DANO = 30  # (era 40; o Gomes achou forte demais)
 
 
 def ultimate(l, outro, jogo):
@@ -278,7 +278,7 @@ _registra("tai_investida", ini=I_INI, ativo=I_CORRE - I_INI, rec=16, janelas=((I
           som="vento", quadros=[(0, "parado"), (I_INI - 2, "t_investida"), (60, "t_investida"), (70, "parado")])
 GOLPES["tai_investida"]["total"] = 9999
 _registra("tai_ultimate", ini=U_PEGA, ativo=6, rec=0, janelas=((U_PEGA, U_PEGA + 6),), caixa=(10, 30, 66, 110),
-          dano=0, hit=60, defe=0, emp=0, nivel="medio", ultimate=True, imbloqueavel=True, logica=ultimate,
+          dano=0, hit=60, defe=0, emp=0, nivel="medio", ultimate=True, logica=ultimate,  # (agora DÁ PRA DEFENDER)
           ia="ultimate", quadros=[(0, "parado"), (U_PEGA - 2, "t_agarra"), (U_PEGA + 30, "t_agarra")])
 GOLPES["tai_ultimate"]["total"] = 9999
 
@@ -304,27 +304,27 @@ PALETA = {
 S_REF = 1.5 / 3
 
 TRONCO = Peca([
-    ".....kkkkkkkkkkkk.....",
-    "..xvvvaaaaaaaaaavwwx..",
-    ".kVVvvaaaaaaaaaavvwwk.",
-    "kVVVvvaaaaaaaaaavvwwwk",
-    "kVVvvvxaaaaaaaaxvvvwwk",
-    "kVVvvvaaaaaaaaaavvvwwk",
-    "kVVvvvaaaaaaaaaavvvwwk",
-    "kVVvvvaaaaaaaaaavvvwwk",
-    "kVVvvvaaaaaaaaaavvvwwk",
-    "kVVvvvaaaaaaaaaavvvwwk",
-    "kVVvvvaaaaxxaaaavvvwwk",
-    "kVVVvvaaaaaaaaaavvwwwk",
-    ".kVVvvaaaaaaaaaavvwwk.",
-    ".kmmmmmmmmmmmmmmmmmmk.",
-    "kMMMmmmmmmmmmmmmmmMMMk",
-    "kmmmmmmmmnnnnmmmmmmmmk",
-    ".kmmmmmmmnnnnmmmmmmmk.",
-    "..kmmmmmmnnnnmmmmmmk..",
-    "....kmmmmnnnnmmmmk....",
-    "......kkkkkkkkkk......",
-], PALETA, a=(11, 18), b=(11, 1))
+    ".....kkkkkkkkkk.....",
+    "..xvvvaaaaaaaavwwx..",
+    ".kVVvvaaaaaaaavvwwk.",
+    "kVVVvvaaaaaaaavvwwwk",
+    "kVVvvvxaaaaaaxvvvwwk",
+    "kVVvvvaaaaaaaavvvwwk",
+    "kVVvvvaaaaaaaavvvwwk",
+    "kVVvvvaaaaaaaavvvwwk",
+    "kVVvvvaaaaaaaavvvwwk",
+    "kVVvvvaaaaaaaavvvwwk",
+    "kVVvvvaaxxaaaavvvwwk",
+    "kVVVvvaaaaaaaavvwwwk",
+    ".kVVvvaaaaaaaavvwwk.",
+    ".kmmmmmmmmmmmmmmmmk.",
+    "kMMMmmmmmmmmmmmmMMMk",
+    "kmmmmmmnnnnmmmmmmmmk",
+    ".kmmmmmnnnnmmmmmmmk.",
+    "..kmmmmnnnnmmmmmmk..",
+    "....kmmnnnnmmmmk....",
+    "......kkkkkkkk......",
+], PALETA, a=(10, 18), b=(10, 1))
 
 CABECA = Peca([
     "....zzz......",
@@ -412,6 +412,28 @@ MAO = Peca([
 ], PALETA, a=(4, 0), b=(4, 5), estica=False)
 
 
+def tatuagem_flor(tela, P, esc):
+    """A TATUAGEM DE ONDA (pedido do Gomes, no lugar da flor): na lateral, entre as costas e a barriga."""
+    azul, claro = (40, 90, 170), (110, 170, 230)
+    pts = [P(2.6 + i * 0.5, 9.0 - 1.6 * math.sin(i * 0.9)) for i in range(9)]  # o corpo da onda
+    pygame.draw.lines(tela, azul, False, pts, max(1, int(0.8 * esc)))
+    c = P(6.6, 7.4)  # a crista enrolando
+    r = 1.6 * esc
+    pygame.draw.arc(tela, azul, (c[0] - r, c[1] - r, 2 * r, 2 * r), 0.3, 4.4, max(1, int(0.7 * esc)))
+    pygame.draw.circle(tela, claro, (round(c[0]), round(c[1])), max(1, int(0.5 * esc)))
+    for k in range(3):  # a espuma
+        e = P(3.2 + k * 1.1, 10.4)
+        pygame.draw.circle(tela, claro, (round(e[0]), round(e[1])), max(1, int(0.4 * esc)))
+
+
+def aura_furia(tela, l, p, esc):
+    """FÚRIA DO SUMÔ ligada: vapor vermelho saindo dele."""
+    for i in range(4):
+        a = l.t * 0.12 + i * 1.6
+        x, y = l.ponto({"_": (math.cos(a) * 18, 50 + ((l.t * 1.5 + i * 20) % 70))}, "_")
+        pygame.draw.circle(tela, (230, 60, 40), (round(x), round(y)), max(1, int((1.6 + (i % 2)) * esc)), 1)
+
+
 def desenhar_tai(l, tela, p, branco):
     esc = l.s / S_REF
     d = l.lado()
@@ -440,12 +462,52 @@ def desenhar_tai(l, tela, p, branco):
     perna("pt", "jt", longe_v)
     perna("pf", "jf", perto_v)
     c, cb = P("pc"), P("cb")
-    TRONCO.desenhar(tela, P("qd"), c, esc, espelho, perto_v)
+    no_tronco = TRONCO.desenhar(tela, P("qd"), c, esc, espelho, perto_v)
+    import pecas
+    if not branco and not l.vira and not (pecas.TROCA or {}).get("a"):  # (não na roupa de camisa)
+        tatuagem_flor(tela, no_tronco, esc)
+    import habilidades
+    if not branco and habilidades.ligada(l, "furia_sumo") and "furia_sumo" in habilidades.ativas(l):
+        aura_furia(tela, l, p, esc)
     u, _ = cabeca_eixos(c, cb, d)
+    gru = l.f.get("estilo") == "gru" and not branco
+    if gru:
+        cachecol_gru(tela, c, cb, esc, d)
     na_cabeca = CABECA.desenhar(tela, cb, mais(cb, u, 10), esc, espelho, perto_v)
     if l.f.get("orelhas") and not branco:
         orelhas_shrek(tela, na_cabeca, esc)
+    if gru:
+        nariz_gru(tela, na_cabeca, esc)
     braco("cf", "mf", perto_v)
+
+
+def cachecol_gru(tela, c, cb, esc, d):
+    """GRU (roupa do Tai): o cachecol listrado cinza e preto, com a ponta caindo na frente."""
+    e = esc * 0.6  # (as medidas aqui são em "pontinhos" do desenho)
+    meio = ((c[0] * 2 + cb[0]) / 3, (c[1] * 2 + cb[1]) / 3)
+    borda = (16, 14, 18)
+    pygame.draw.ellipse(tela, borda, (meio[0] - 13 * e, meio[1] - 6 * e, 26 * e, 12 * e))
+    for i in range(5):  # a volta no pescoço, listrada
+        x = meio[0] - 11 * e + i * 4.4 * e
+        cor = (170, 170, 178) if i % 2 == 0 else (40, 40, 46)
+        pygame.draw.rect(tela, cor, (x, meio[1] - 4.5 * e, 4.4 * e, 9 * e))
+    ponta = [(meio[0] + d * 3 * e, meio[1] + 3 * e), (meio[0] + d * 10 * e, meio[1] + 3 * e),
+             (meio[0] + d * 12 * e, meio[1] + 26 * e), (meio[0] + d * 5 * e, meio[1] + 26 * e)]
+    pygame.draw.polygon(tela, borda, ponta)
+    for k in range(4):  # a ponta caindo, listrada também
+        y0 = meio[1] + (4 + k * 5.25) * e
+        cor = (170, 170, 178) if k % 2 == 0 else (40, 40, 46)
+        pygame.draw.polygon(tela, cor, [(meio[0] + d * (4 + k * 0.3) * e, y0), (meio[0] + d * (9.4 + k * 0.5) * e, y0),
+                                        (meio[0] + d * (9.9 + k * 0.5) * e, y0 + 5 * e),
+                                        (meio[0] + d * (4.3 + k * 0.3) * e, y0 + 5 * e)])
+
+
+def nariz_gru(tela, P, esc):
+    """GRU: o narigão pontudo."""
+    pts = [P(9.4, 5.2), P(15.5, 7.6), P(9.6, 8.8)]
+    pygame.draw.polygon(tela, (20, 14, 12), pts)
+    pygame.draw.polygon(tela, (232, 206, 182), [P(9.9, 5.8), P(14.2, 7.6), P(10.0, 8.2)])
+    pygame.draw.line(tela, (190, 160, 136), P(10.2, 7.9), P(13.6, 7.7), max(1, int(esc * 0.5)))
 
 
 def orelhas_shrek(tela, P, esc):

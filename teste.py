@@ -18,6 +18,9 @@ import roupas as roupas  # noqa: E402
 from lutador import Entrada, Lutador  # noqa: E402
 from partida import Partida  # noqa: E402
 from personagens import BONECO, PERSONAGENS, boneco, sombra  # noqa: E402
+FORCA_REAL = {f["nome"]: f["forca"] for f in PERSONAGENS}  # (o EQUILÍBRIO: a força de cada um multiplica o dano)
+for _f in PERSONAGENS:  # os testes de cada golpe conferem o dano BASE (força 1); a força é testada no fim
+    _f["forca"] = 1.0
 from rib import tem_shuriken  # noqa: E402
 
 pygame.init()
@@ -378,10 +381,18 @@ for _ in range(6 * 18 + 10):
     saiu += len(p.projeteis) > antes
 checar(saiu == 5, f"RIB: depois de 5 shurikens rapidinhas tem que recarregar ({saiu} saíram de 6)")
 
-# R: corrida
-p = contra_rib([Entrada(5, especial="R")], distancia=300)
-rodar(p, 120)
-checar(dano(p) == 25, f"RIB: corrida acerta 5 vezes de 5 ({dano(p)})")
+# R: KAGE BUNSHIN (corre, encosta, aparece um clone do outro lado: 10 hits de 2)
+def sem_objeto(p):
+    p.objetos.pronto, p.objetos.recarga = False, 10 ** 9  # (o objeto do cenário também bate)
+    return p
+
+
+p = sem_objeto(contra_rib([Entrada(5, especial="R")], distancia=200))
+rodar(p, 260)
+checar(dano(p) == 20, f"RIB: KAGE BUNSHIN com o clone tira 10 x 2 = 20 ({dano(p)})")
+p = sem_objeto(contra_rib([Entrada(5, especial="R")], distancia=700))
+rodar(p, 260)
+checar(dano(p) == 0, f"RIB: KAGE BUNSHIN de longe não acha ninguém ({dano(p)})")
 
 # Q: rasteira + chute pra cima
 p = contra_rib([Entrada(5, especial="Q")], distancia=90)
@@ -391,15 +402,53 @@ for _ in range(80):
     altura = max(altura, CHAO - p.L[1].y)
 checar(dano(p) == 10 and altura > 120, f"RIB: rasteira + chute joga pra cima ({dano(p)} de dano, {int(altura)} px)")
 
-# SHIFT: linguada
-p = contra_rib([Entrada(5, especial="SHIFT")], distancia=200)
-x0 = p.L[1].x
-rodar(p, 70)
-checar(dano(p) == 20, f"RIB: linguada tira 20 ({dano(p)})")
-checar(p.L[1].x < x0, "RIB: a língua puxa o outro pra perto")
-p = contra_rib([Entrada(5, especial="SHIFT")], [Entrada()] * 10 + [Entrada(6)] * 60, distancia=140)
-rodar(p, 70)
-checar(dano(p) == 0 or p.L[1].estado == "defendendo" or dano(p) < 20, "RIB: linguada demora pra sair (dá tempo de reagir)")
+# SHIFT: KUNAI COM CORRENTE (fisga, se puxa e chega com a voadora)
+p = sem_objeto(contra_rib([Entrada(5, especial="SHIFT")], distancia=330))
+perto = 999
+for _ in range(260):
+    p.passo(None)
+    perto = min(perto, abs(p.L[0].x - p.L[1].x))
+checar(dano(p) == 16 and perto < 90, f"RIB: kunai fisga (4) + voadora (12) = 16 e ele chega perto ({dano(p)}, {perto:.0f})")
+p = sem_objeto(contra_rib([Entrada(5, especial="SHIFT")], distancia=650))
+rodar(p, 260)
+checar(dano(p) == 0, f"RIB: kunai de muito longe volta sem nada ({dano(p)})")
+
+# PASSIVA SAPO NINJA: pulo alto, pulo duplo, menos dano no ar, substituição
+def altura_pulo(ficha, passos):
+    p = sem_objeto(Partida(ficha, ALVO, Roteiro(passos), Roteiro([])))
+    p.fase, p.tf = "luta", 0
+    menor = CHAO
+    for _ in range(150):
+        p.passo(None)
+        menor = min(menor, p.L[0].y)
+    return CHAO - menor
+
+
+_pula = [Entrada(), Entrada(8), Entrada(8)]
+_um = altura_pulo(RIB, _pula)
+_dois = altura_pulo(RIB, _pula + [Entrada()] * 16 + [Entrada(8), Entrada(8)])
+_seg = altura_pulo(RIB, [Entrada()] + [Entrada(8)] * 60)
+_kun = altura_pulo(PERSONAGENS[6], _pula)
+checar(_um > _kun * 1.15, f"RIB: pulo de sapo mais alto que o normal ({_um:.0f} x {_kun:.0f})")
+checar(_dois > _um * 1.3 and abs(_seg - _um) < 3,
+       f"RIB: PULO DUPLO só apertando de novo no ar ({_um:.0f} / {_dois:.0f} / segurando {_seg:.0f})")
+_l = Lutador(RIB, 300, 1)
+_l.y = CHAO - 100
+import habilidades as _hab  # noqa: E402
+_no_ar = _hab.mult_recebe(_l)
+_l.y = CHAO
+checar(abs(_no_ar - 0.8) < 1e-6 and _hab.mult_recebe(_l) == 1.0, "RIB: no ar leva 20% menos dano")
+p = sem_objeto(Partida(PERSONAGENS[8], RIB, Roteiro([Entrada(), Entrada(especial="E")]), Roteiro([])))
+p.fase, p.tf = "luta", 0
+p.L[0].x, p.L[1].x = 400, 520
+_v0 = p.L[1].vida
+rodar(p, 120)
+checar(p.L[1].vida == _v0 and p.L[1].extra.get("subst_espera", 0) > 0 and p.L[1].x < p.L[0].x,
+       f"RIB: SUBSTITUIÇÃO: o golpe pega no tronco e ele aparece atrás ({p.L[1].vida}, x {p.L[1].x:.0f})")
+p.L[0].x, p.L[1].x, p.L[0].dir = 400, 520, 1
+p.ctrl = (Roteiro([Entrada(), Entrada(especial="E")]), p.ctrl[1])
+rodar(p, 140)
+checar(p.L[1].vida < _v0, "RIB: logo depois não substitui de novo (recarga de 10 s)")
 
 # Z: ultimate (KAGE BUNSHIN)
 p = contra_rib([Entrada(5, especial="Z")], [], distancia=300)
@@ -459,10 +508,27 @@ p = contra_trafo([Entrada(5, especial="Q")], [Entrada()] * 28 + [Entrada(8)] * 3
 rodar(p, 120)
 checar(dano(p) == 0, "TRAFO: pulando no sinal, os braços erram")
 
-# R: metralhadora de olhos
-p = contra_trafo([Entrada(5, especial="R")], distancia=400)
-rodar(p, 140)
-checar(dano(p) == 24, f"TRAFO: metralhadora de olhos dá 6 tiros de 4 ({dano(p)})")
+# R: TRANSFORMAÇÃO (vira o Rib, faz o kage bunshin, volta) e o CLONE que repete cada hit por 5 s
+p = contra_trafo([Entrada(5, especial="R")], distancia=200)
+p.objetos.pronto, p.objetos.recarga = False, 10 ** 9
+virou_rib = False
+for _ in range(40):
+    p.passo(None)
+    virou_rib |= bool(p.L[0].disfarce and p.L[0].disfarce["nome"] == "RIB")
+checar(virou_rib and p.L[0].disfarce is None and p.L[0].extra.get("clone_t", 0) > 250,
+       "TRAFO: TRANSFORMAÇÃO vira o Rib, volta, e o CLONE aparece (5 s)")
+p.L[0].x, p.L[1].x = 380, 560
+_v0 = p.L[1].vida
+p.ctrl = (Roteiro([Entrada(), Entrada(5, especial="SHIFT")]), p.ctrl[1])
+rodar(p, 70)
+checar(abs((_v0 - p.L[1].vida) - 20) < 0.01, f"TRAFO: com o clone, o pulão (10) vale 2 hits = 20 ({_v0 - p.L[1].vida:.1f})")
+rodar(p, 400)
+p.L[0].x, p.L[1].x = 380, 560
+_v0 = p.L[1].vida
+p.ctrl = (Roteiro([Entrada(), Entrada(5, especial="SHIFT")]), p.ctrl[1])
+rodar(p, 70)
+checar(p.L[0].extra.get("clone_t", 0) == 0 and abs((_v0 - p.L[1].vida) - 10) < 0.01,
+       f"TRAFO: depois de 5 s o clone some (pulão = 10 de novo: {_v0 - p.L[1].vida:.1f})")
 
 # SHIFT: pulão
 p = contra_trafo([Entrada(5, especial="SHIFT")], distancia=500)
@@ -484,7 +550,7 @@ for q in range(700):
         virou.add(p.L[0].disfarce["nome"])
     if q % 20 == 0:
         p.desenhar(tela)  # desenhar disfarçado não pode dar erro
-checar(not teve_cena and dano(p) == 40, f"TRAFO: ultimate sem cutscene, dentro da luta, tira 40 ({dano(p)})")
+checar(not teve_cena and dano(p) == 35, f"TRAFO: ultimate sem cutscene, dentro da luta, tira 35 ({dano(p)})")
 checar(virou == {"MAX-10", ALVO["nome"]}, f"TRAFO: na ultimate vira o Max-10 e depois o oponente ({sorted(virou)})")
 checar(p.L[0].disfarce is None, "TRAFO: no final volta a ser o Trafo")
 p = contra_trafo([Entrada(5, especial="Z")], [Entrada(6)] * 400, distancia=250)
@@ -497,7 +563,7 @@ checar(not teve_cena, "TRAFO: ultimate defendida erra")
 p = contra_trafo([], distancia=200)
 l0 = p.L[0]
 l0.encher(100)
-checar(l0.barra == 50, f"TRAFO: a barra do ultimate enche na metade da velocidade ({l0.barra})")
+checar(l0.barra == 100, f"TRAFO: a barra do ultimate enche normal ({l0.barra})")
 
 # =====================================================================
 # KING RIP
@@ -593,14 +659,14 @@ for _ in range(700):
         cansou += 1
 checar(dano(p) == 40, f"CANNAN: ultimate dá 20 tiros de 2 ({dano(p)})")
 checar(280 <= cansou <= 320, f"CANNAN: depois da ultimate fica 5s sem agir ({cansou} quadros)")
-p = contra_cannan(segurando_z(320), distancia=250)
+p = contra_cannan(segurando_z(200), distancia=250)
 p.L[0].barra = BARRA_MAX
 cansou = 0
 for _ in range(1100):
     p.passo(None)
     if p.L[0].estado == "tonto" and p.L[0].superaquecido:
         cansou += 1
-checar(dano(p) == 50, f"CANNAN: ultimate carregada (5s segurando Z) tira 50 ({dano(p)})")
+checar(dano(p) == 50, f"CANNAN: ultimate carregada (3s segurando Z) tira 50 ({dano(p)})")
 checar(400 <= cansou <= 440, f"CANNAN: ultimate carregada deixa 7s sem agir ({cansou} quadros)")
 p = contra_cannan([], distancia=300)
 c, o = p.L[0], p.L[1]
@@ -661,8 +727,14 @@ for f in PERSONAGENS:
         if q % 15 == 0:
             p.desenhar(tela)
     l0 = p.L[0]
-    checar("entrada" in fases and p.fase == "intro" and l0.y == CHAO and not l0.esconde and not l0.sobrepor,
-           f"ENTRADA: {f['nome']} entra e fica pronto pra luta")
+    checar("entrada" in fases and p.fase == "falas" and l0.y == CHAO and not l0.esconde and not l0.sobrepor,
+           f"ENTRADA: {f['nome']} entra e fica pronto pra luta (e vai falar)")
+    while p.fase == "falas":
+        p.passo(None)
+        if p.tf % 40 == 0:
+            p.desenhar(tela)
+    checar(p.fase == "intro" and l0.pose_espera is None and l0.f["espera"] in l0.poses,
+           f"ENTRADA: {f['nome']} espera na pose '{f['espera']}', fala e vai pra pose de luta")
     checar(callable(f.get("entrada")) and callable(f.get("vitoria")),
            f"ENTRADA: {f['nome']} tem entrada e pose de vitória próprias")
 
@@ -696,7 +768,7 @@ mx.levar(8, alvo, GOLPES["chute"])
 checar(abs((v - mx.vida) - 6) < 0.01, f"HABILIDADE: Max-10 no Maquinário leva 6 em vez de 8 ({v - mx.vida})")
 # Rib: Postura Ninja
 p = contra_rib([], distancia=200)
-checar(p.L[0].corpo().w < 44 * p.L[0].s * 0.85, "HABILIDADE: Rib com hitbox mais fininha (Postura Ninja)")
+checar("ninja" in hab.ativas(p.L[0]) and hab.mult_recebe(p.L[0]) == 1.0, "HABILIDADE: Rib com a passiva SAPO NINJA")
 # Trafo: Conexão Terrestre
 TRAFO["habilidade"] = "conexao"
 p = contra_trafo([Entrada(2)] * 20, distancia=300)
@@ -705,7 +777,23 @@ checar(p.L[0].corpo().h < 80 * p.L[0].s * 0.9 * 0.55, "HABILIDADE: Trafo agachad
 checar(hab.mult_causa(p.L[0], GOLPES["ag_chute"]) == 2.0 and hab.mult_causa(p.L[0], GOLPES["chute"]) == 1.0,
        "HABILIDADE: Trafo agachado bate o dobro")
 checar(hab.mult_recebe(p.L[0]) == 0.8, "HABILIDADE: Trafo agachado leva 20% menos dano")
-# Trafo: Mutação
+# Trafo: Adaptação (o mesmo golpe, a cada uso que acerta, tira 10% menos; até 40%)
+checar(TRAFO["habilidades_opcoes"] == ("conexao", "adaptacao") and "barra_mult" not in TRAFO,
+       "HABILIDADE: o Trafo escolhe Conexão Terrestre ou ADAPTAÇÃO (e a barra enche normal)")
+TRAFO["habilidade"] = "adaptacao"
+_tr, _at = Lutador(TRAFO, 500, -1), Lutador(BONECO, 400, 1)
+_at.nome_golpe = "soco"
+_mults = []
+for _uso in range(6):
+    _at.golpe_id = _uso
+    _mults.append(round(hab.mult_recebe(_tr, _at, GOLPES["soco"]), 2))
+_at.nome_golpe = "chute"
+_outro = round(hab.mult_recebe(_tr, _at, GOLPES["chute"]), 2)
+_at.nome_golpe, _at.golpe_id = "soco", 5
+_mesmo = round(hab.mult_recebe(_tr, _at, GOLPES["soco"]), 2)
+checar(_mults == [1.0, 0.9, 0.8, 0.7, 0.6, 0.6] and _outro == 1.0 and _mesmo == 0.6,
+       f"HABILIDADE: ADAPTAÇÃO: o mesmo golpe tira 10% menos a cada uso, até 40% ({_mults}, outro {_outro}, mesmo uso {_mesmo})")
+# Trafo: Mutação (saiu das opções, mas o código continua)
 TRAFO["habilidade"] = "mutacao"
 p = Partida(RIB, TRAFO, Roteiro([Entrada(5, especial="Z")]), Roteiro([]))
 p.fase, p.tf = "luta", 0
@@ -718,6 +806,7 @@ checar(tr.mutado is RIB and tr.disfarce is RIB, "HABILIDADE: Trafo levou ultimat
 checar(tr.golpe_do_botao("E") == "rib_shuriken" and "ninja" in hab.ativas(tr) and "mutacao" in hab.ativas(tr),
        "HABILIDADE: mutado, usa os golpes e a habilidade do Rib e continua com a Mutação")
 p.L[0].vida = p.L[0].vida_max
+p.L[0].extra["subst_espera"] = 10 ** 6  # (sem a substituição do Rib: a shuriken tem que pegar nele)
 tr.estado, tr.t = "parado", 0
 p.ctrl = (p.ctrl[0], Roteiro([Entrada(5, especial="E")] + [Entrada()] * 40))
 for q in range(60):
@@ -787,7 +876,8 @@ for n in range(20):
         for l in p.L:
             golpes.add(l.nome_golpe)
             if l.no_chao() and l.estado != "agarrado" and p.fase != "entrada":  # (entrada pode vir de fora)
-                assert PAREDE_E <= l.x <= PAREDE_D, "saiu da tela"
+                assert PAREDE_E <= l.x <= PAREDE_D, ("saiu da tela", l.f["nome"], int(l.x), l.estado, l.nome_golpe,
+                                                     [(o.f["nome"], o.estado, o.nome_golpe, o.t) for o in p.L], p.fase)
         if fotos and n == 0 and q % 97 == 0 and q < 97 * 30:
             p.desenhar(tela)
             pygame.image.save(tela, os.path.join(pasta, f"luta_{q // 97:02d}.png"))
@@ -797,8 +887,8 @@ for n in range(20):
 checar(terminadas == 20, f"20 partidas do computador terminaram ({terminadas})")
 precisa = {"soco", "chute", "ag_chute",  # (os golpes do boneco de treino não contam: ele quase não aparece)
            "max_laser", "max_voo", "max_agarrao", "max_gatling", "max_rasante",
-           "rib_shuriken", "rib_corrida", "rib_rasteira", "rib_lingua", "rib_ultimate",
-           "trafo_lingua", "trafo_terra", "trafo_olhos", "trafo_pulo",
+           "rib_shuriken", "rib_bunshin", "rib_rasteira", "rib_kunai", "rib_ultimate",
+           "trafo_lingua", "trafo_terra", "trafo_transforma", "trafo_pulo",
            "king_bumerangue", "king_chute", "king_giro", "king_salto"}
 checar(precisa <= golpes, f"o computador usa os golpes todos (faltou: {sorted(precisa - golpes)})")
 
@@ -822,7 +912,8 @@ checar(len(falas.dialogo(PERSONAGENS[0], sombra(PERSONAGENS[0]))) == 2, "FALAS: 
 vs = TelaVS(PERSONAGENS[3], PERSONAGENS[4])
 for _ in range(vs.DURACAO):
     vs.desenhar(tela)
-checar(vs.acabou and vs.DURACAO > 150, f"FALAS: a tela de VS espera as falas ({vs.DURACAO} quadros)")
+checar(vs.acabou and not vs.falas and vs.DURACAO == 150,
+       f"FALAS: a tela de VS ficou curtinha (as falas agora são na arena) ({vs.DURACAO} quadros)")
 
 import importlib  # noqa: E402
 ok = True
@@ -830,7 +921,7 @@ for f in PERSONAGENS:
     modulo = importlib.import_module(f["desenho"].__module__)
     for r in roupas.da(f):
         ok &= all(letra in modulo.PALETA for letra in r.get("troca", {}))
-checar(ok and all(len([r for r in roupas.da(f) if not r.get("codigo")]) == 3 for f in PERSONAGENS),
+checar(ok and all(len([r for r in roupas.da(f) if not r.get("codigo") and not r.get("evento") and not r.get("album")]) == 3 for f in PERSONAGENS),
        "ROUPAS: cada personagem tem 2 roupas novas que trocam cores que existem")
 from cannan import TRONCO as _tronco  # noqa: E402
 pecas.usar_troca(None)
@@ -870,7 +961,8 @@ def ganha_luta(nivel, perfect=True, vida=60):
 
 antes = save.moedas()
 p = ganha_luta("DIFÍCIL")
-checar(p.premio and p.premio[3] == (MOEDAS_VITORIA + MOEDAS_PERFECT + 10) * 2 and save.moedas() == antes + p.premio[3] + sum(v for _, v in p.premio[4]),
+checar(p.premio and p.premio[3] == (MOEDAS_VITORIA + MOEDAS_PERFECT + 10) * 2 and save.moedas() == antes + p.premio[3] + sum(v for _, v in p.premio[4])
+       + sum(m for _, m, _ in p.missoes_feitas),  # (+ as MISSÕES DO DIA que essa luta cumpriu)
        f"MOEDAS: vitória + perfect + vida no DIFÍCIL vale o dobro ({p.premio and p.premio[3]})")
 p = ganha_luta("FÁCIL", perfect=False)
 checar(p.premio[3] == round((MOEDAS_VITORIA + 6) * 0.5), f"MOEDAS: no FÁCIL vale a metade ({p.premio[3]})")
@@ -937,7 +1029,23 @@ jogo.partida.desenhar(tela)
 jogo.desenhar_pausa()
 jogo.pausa(pygame.K_RETURN)
 checar(not jogo.pausado, "PAUSA: o menu desenha e CONTINUAR volta pra luta")
-jogo.pausado, jogo.opcao_pausa = True, 2
+# ---- MODO FOTO (na pausa) ----
+os.environ["BW_FOTOS"] = os.path.join(os.path.dirname(SAVE_TESTE), "luta_maria_fotos")
+jogo.pausado, jogo.opcao_pausa = True, luta.PAUSA.index("MODO FOTO")
+jogo.pausa(pygame.K_RETURN)
+checar(jogo.tela_atual == "foto", "MODO FOTO: a pausa abre o modo foto")
+jogo.evento_rei  # (existe)
+jogo.tfoto.evento(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_f, unicode="", mod=0, scancode=0))
+jogo.tfoto.desenhar(tela)
+jogo.tfoto.tecla(pygame.K_RETURN)
+_foto = jogo.tfoto.ultima_foto
+checar(_foto and os.path.exists(_foto), "MODO FOTO: ENTER salva o PNG")
+if _foto and os.path.exists(_foto):
+    os.remove(_foto)
+jogo.tfoto.tecla(pygame.K_ESCAPE)
+checar(jogo.tfoto.sair, "MODO FOTO: ESC volta pra pausa")
+jogo.tela_atual = "luta"
+jogo.pausado, jogo.opcao_pausa = True, luta.PAUSA.index("MENU PRINCIPAL")
 jogo.pausa(pygame.K_RETURN)
 checar(jogo.tela_atual == "titulo", "PAUSA: MENU PRINCIPAL volta pro título")
 jogo.desenhar_titulo()
@@ -964,17 +1072,17 @@ altura = 0
 for _ in range(90):
     p.passo(None)
     altura = max(altura, CHAO - p.L[1].y)
-checar(dano(p) == 10 and altura > 60, f"FINN: levitação de média distância tira 10 e joga pra cima ({dano(p)}, {int(altura)} px)")
+checar(dano(p) == 12 and altura > 60, f"FINN: levitação de média distância tira 12 e joga pra cima ({dano(p)}, {int(altura)} px)")
 p = contra_finn([Entrada(5, especial="Q")], distancia=60)
 rodar(p, 90)
 checar(dano(p) == 0, "FINN: levitação é de média distância (colado não pega)")
 p = contra_finn([Entrada(5, especial="R")], distancia=100)
 rodar(p, 120)
-checar(dano(p) == 20, f"FINN: cajado amarelo dá 5 hits de 4 ({dano(p)})")
+checar(dano(p) == 25, f"FINN: cajado amarelo dá 5 hits de 5 ({dano(p)})")
 p = contra_finn([Entrada(5, especial="SHIFT")], distancia=260)
 x0 = p.L[0].x
 rodar(p, 60)
-checar(dano(p) == 5 and p.L[0].x - x0 > 60, f"FINN: empurrão mágico vai pra frente e tira 5 ({dano(p)})")
+checar(dano(p) == 7 and p.L[0].x - x0 > 60, f"FINN: empurrão mágico vai pra frente e tira 7 ({dano(p)})")
 p = contra_finn([Entrada(5, especial="Z")], distancia=300)
 p.L[0].barra = BARRA_MAX
 rodar(p, 260)
@@ -994,6 +1102,30 @@ while p.fase == "entrada":
         viu_meio = True
         p.desenhar(tela)
 checar(viu_meio and p.L[0].cortar_acima is None, "FINN: se materializa dos pés à cabeça")
+# FINN: as 2 passivas novas (H troca): ALQUIMIA e FEITIÇO DE CURA
+checar(FINN["habilidade"] == "alquimia" and FINN["habilidades_opcoes"] == ("alquimia", "cura"),
+       "FINN: passivas ALQUIMIA (começa) e FEITIÇO DE CURA")
+_f = Lutador(FINN, 300, 1)
+_f.vida = 50
+for _ in range(hab.POCAO_ESPERA - 1):
+    hab.finn_quadro(_f, None)
+_antes = _f.extra.get("pocao")
+hab.finn_quadro(_f, None)
+checar(_antes is None and _f.extra.get("pocao") in hab.POCOES, f"FINN: ALQUIMIA bebe uma poção a cada 20 s ({_f.extra.get('pocao')})")
+_g = Lutador(FINN, 300, 1)
+_g.extra["pocao_forca"] = 10
+_forca = hab.mult_causa(_g, GOLPES["soco"])
+_g.extra["pocao_forca"], _g.extra["pocao_veloz"] = 0, 10
+checar(abs(_forca - 1.25) < 1e-6 and abs(hab.mult_vel(_g) - 1.25) < 1e-6,
+       f"FINN: poção de FORÇA = +25% de dano e de VELOCIDADE = +25% ({_forca}, {hab.mult_vel(_g)})")
+_h = Lutador(dict(FINN, habilidade="cura"), 300, 1)
+_h.vida = 50
+for _c in range(1, 12):
+    _h.combo = _c
+    hab.finn_quadro(_h, None)
+checar(_h.vida == 60, f"FINN: FEITIÇO DE CURA, combo de 11 = +10 de vida ({_h.vida})")
+# FINN: o PODER MÁGICO antigo (saiu das opções, o código continua)
+FINN["habilidade"] = "poder_magico"
 p = contra_finn([], distancia=80)
 f, o = p.L[0], p.L[1]
 for _ in range(COMBO_MAXIMO):
@@ -1006,6 +1138,7 @@ for _ in range(30):
 checar(0 < f.invisivel < INVISIVEL_TEMPO, "FINN: a invisibilidade vai acabando (e desenha sem quebrar)")
 rodar(p, INVISIVEL_TEMPO)
 checar(f.invisivel == 0, "FINN: depois de 3 segundos aparece de novo")
+FINN["habilidade"] = "alquimia"
 
 # =====================================================================
 # KUN
@@ -1063,9 +1196,9 @@ for _ in range(10):
     p.desenhar(tela)
 
 # =====================================================================
-# XENOMORPH
+# TROMOS (era o XENOMORPH)
 # =====================================================================
-XENO = next(f for f in PERSONAGENS if f["nome"] == "XENOMORPH")
+XENO = next(f for f in PERSONAGENS if f["nome"] == "TROMOS")
 
 
 def contra_xeno(passos_xeno, passos_alvo=(), distancia=None):
@@ -1079,9 +1212,9 @@ def contra_xeno(passos_xeno, passos_alvo=(), distancia=None):
 p = contra_xeno([Entrada(5, especial="E")], distancia=250)
 rodar(p, 40)
 d_cuspe = dano(p)
-checar(d_cuspe == 8 and p.L[0].extra.get("pocas"), f"XENO: cuspe de ácido tira 8 e deixa poça ({d_cuspe})")
+checar(d_cuspe == 9 and p.L[0].extra.get("pocas"), f"XENO: cuspe de ácido tira 9 e deixa poça ({d_cuspe})")
 rodar(p, 200)
-checar(dano(p) == 11 and not p.L[0].extra.get("pocas"), f"XENO: a poça queima 1 por segundo e some em 3 s ({dano(p)})")
+checar(dano(p) == 12 and not p.L[0].extra.get("pocas"), f"XENO: a poça queima 1 por segundo e some em 3 s ({dano(p)})")
 p = contra_xeno([Entrada(5, especial="Q")], distancia=90)
 altura = 0
 for _ in range(80):
@@ -1090,10 +1223,10 @@ for _ in range(80):
 checar(dano(p) == 15 and altura > 80, f"XENO: rabada tira 15 e joga pra cima ({dano(p)}, {int(altura)} px)")
 p = contra_xeno([Entrada(5, especial="R")], distancia=95)
 rodar(p, 100)
-checar(dano(p) == 18, f"XENO: garras dão 6 hits de 3 ({dano(p)})")
+checar(dano(p) == 24, f"XENO: garras dão 6 hits de 4 ({dano(p)})")
 p = contra_xeno([Entrada(5, especial="SHIFT")], distancia=300)
 rodar(p, 50)
-checar(dano(p) == 6, f"XENO: rasteja tira 6 ({dano(p)})")
+checar(dano(p) == 8, f"XENO: rasteja tira 8 ({dano(p)})")
 p = contra_xeno([Entrada()] * 8 + [Entrada(5, especial="SHIFT")], distancia=500)
 p.L[1].f = dict(p.L[1].f, golpes={"E": "max_laser"})
 p2 = Partida(XENO, CANNAN, Roteiro([Entrada()] * 14 + [Entrada(5, especial="SHIFT")]),
@@ -1104,22 +1237,49 @@ rodar(p2, 60)
 checar(p2.L[0].vida == 100, "XENO: rastejando passa por baixo dos tiros (a pistola do Cannan)")
 p = contra_xeno([Entrada(5, especial="Z")], distancia=250)
 p.L[0].barra = BARRA_MAX
+p.L[0].vida = 50
 pegou = False
 for _ in range(260):
     p.passo(None)
     pegou |= "pegou" in p.L[0].memo
     if pegou:
         p.desenhar(tela)
-checar(pegou and dano(p) == 35 and p.L[0].estado != "ataque", f"XENO: SEGUNDA BOCA pega e tira 35 ({dano(p)})")
+checar(pegou and dano(p) == 25 and p.L[0].estado != "ataque", f"XENO: SEGUNDA BOCA pega e tira 25 ({dano(p)})")
+checar(p.L[0].vida == 65, f"XENO: cada mordida da SEGUNDA BOCA cura 3 (5 x 3 = +15: {p.L[0].vida})")
 p = contra_xeno([Entrada(5, especial="Z")], [Entrada()] * 10 + [Entrada(8)] * 3, distancia=280)
 p.L[0].barra = BARRA_MAX
 rodar(p, 200)
 checar(dano(p) == 0, f"XENO: pulando, a ultimate erra ({dano(p)})")
+# TROMOS: as 2 passivas novas (H troca): EMBOSCADA e REGENERAÇÃO
+checar(XENO["habilidade"] == "emboscada" and XENO["habilidades_opcoes"] == ("emboscada", "regeneracao"),
+       "TROMOS: passivas EMBOSCADA (começa) e REGENERAÇÃO")
+
+
+class _Jogo:
+    def __init__(self, *lut):
+        self.L = list(lut)
+
+
+_t = Lutador(XENO, 300, 1)
+for _ in range(int(_hab.EMBOSCADA_ESPERA) + 2):
+    _hab.tromos_quadro(_t, _Jogo(_t))
+checar(_t.extra.get("camuflado") and _t.invisivel > 0, "TROMOS: EMBOSCADA, parado 1,5 s fica CAMUFLADO")
+_r = Lutador(dict(XENO, habilidade="regeneracao"), 300, 1)
+_o = Lutador(BONECO, 500, -1)
+_r.vida = 50
+_j = _Jogo(_r, _o)
+for _estado in ("parado", "caido", "caido", "parado", "caido"):
+    _o.estado = _estado
+    _hab.tromos_quadro(_r, _j)
+checar(_r.vida == 50 + 2 * _hab.REGENERA_VIDA == 62, f"TROMOS: REGENERAÇÃO, cada vez que o outro CAI = +6 ({_r.vida})")
+# TROMOS: o SANGUE ÁCIDO antigo (saiu das opções, o código continua)
+XENO["habilidade"] = "sangue_acido"
 p = Partida(MAX, XENO, Roteiro([Entrada(5, soco=True)]), Roteiro([]))
 p.fase = "luta"
 p.L[1].x = p.L[0].x + 80
 rodar(p, 30)
 checar(p.L[0].vida == 100 - 1 and p.L[1].vida < 100, f"XENO: SANGUE ÁCIDO, quem soca leva 1 ({p.L[0].vida})")
+XENO["habilidade"] = "emboscada"
 p = Partida(CANNAN, XENO, Roteiro([Entrada(5, especial="E")]), Roteiro([]))
 p.fase = "luta"
 p.L[1].x = p.L[0].x + 300
@@ -1167,16 +1327,19 @@ for _ in range(300):
     pegou |= "pegou" in p.L[0].memo
     if pegou and p.tf % 7 == 0:
         p.desenhar(tela)
-checar(pegou and dano(p) == 40 and p.L[0].estado != "ataque", f"TAI: YOKOZUNA levanta, pula e senta: 40 ({dano(p)})")
+checar(pegou and dano(p) == 30 and p.L[0].estado != "ataque", f"TAI: YOKOZUNA levanta, pula e senta: 30 ({dano(p)})")
 p = contra_tai([Entrada(5, especial="Z")], distancia=300)
 p.L[0].barra = BARRA_MAX
 rodar(p, 200)
 checar(dano(p) == 0, "TAI: de longe a Yokozuna erra (tem que estar colado)")
+checar(TAI["habilidade"] == "furia_sumo", "TAI: a passiva agora é a FÚRIA DO SUMÔ")
+TAI["habilidade"] = "peso_pesado"  # (o PESO PESADO antigo: saiu, mas o código continua)
 p = Partida(MAX, TAI, Roteiro([Entrada()] * 3 + [Entrada(5, soco=True)]), Roteiro([Entrada(5, especial="R")]))
 p.fase = "luta"
 p.L[1].x = p.L[0].x + 85
 rodar(p, 12)
 checar(p.L[1].estado == "ataque" and p.L[1].vida < 120, "TAI: PESO PESADO, o soco tira vida mas ele continua o golpe")
+TAI["habilidade"] = "furia_sumo"
 
 # =====================================================================
 # TAMER (e o lobo)
@@ -1237,7 +1400,7 @@ rodar(p, 3)
 checar(p.L[0].extra["lobo_cor"] == "preto", "TAMER: X troca o lobo branco pelo preto")
 b = contra_tamer([Entrada(5, especial="R")], distancia=95)
 rodar(b, 120)
-checar(abs(dano(b) - 30) < 0.01, f"TAMER: LOBO BRANCO = +25% de dano (24 -> {dano(b)})")
+checar(abs(dano(b) - 36) < 0.01, f"TAMER: LOBO BRANCO = +50% de dano (24 -> {dano(b)})")
 duracao = []
 for preto in (False, True):
     p = contra_tamer([Entrada(5, especial="R")], distancia=95, preto=preto)
@@ -1263,7 +1426,7 @@ for _ in range(DURACAO_ENTRADA + 30):
     p.passo(None)
     if p.tf % 11 == 0:
         p.desenhar(tela)
-checar(p.fase in ("intro", "luta"), "TAMER: entra correndo com o lobo (na SELVA)")
+checar(p.fase in ("falas", "intro", "luta"), "TAMER: entra correndo com o lobo (na SELVA)")
 
 # ---- PROVOCAÇÃO ----
 
@@ -1517,6 +1680,34 @@ secretas = {"Iron Man": ("MAX-10", "wartank"), "Fenrir": ("TAMER", "zeus"), "Meg
 checar(all(not save.tem_roupa(n, r) for n, r in secretas.values()), "CÓDIGOS: as roupas secretas começam trancadas")
 ok = all(codigos.usar(c) and save.tem_roupa(n, r) and save.usando(n) == r for c, (n, r) in secretas.items())
 checar(ok, "CÓDIGOS: Iron Man, Fenrir, Mega-Cannon, Fightmon e Dinowolf dão as roupas secretas (e já vestem)")
+checar(codigos.usar("Tiger Hat") and save.tem_roupa("JOHN", "gatola") and save.usando("JOHN") == "gatola"
+       and roupas.vestir(next(f for f in PERSONAGENS if f["nome"] == "JOHN"))["estilo"] == "gatola",
+       "CÓDIGOS: TIGERHAT dá o GATOLA DA CARTOLA pro John (cartola listrada e bigodes)")
+tcd = codigos.TelaCodigos()
+for ch in "Card&Fight":
+    tcd.tecla(pygame.event.Event(pygame.KEYDOWN, key=0, unicode=ch))
+checar(tcd.digitado == "CARD&FIGHT", f"CÓDIGOS: dá pra digitar o & (Card&Fight) ({tcd.digitado})")
+for codigo, nome, roupa in (("The Best Magician", "FINN", "gandalf"), ("The Moon Is Mine", "TAI", "gru"),
+                            ("Untamable", "TROMOS", "indominus"), ("Card&Fight", "KUN", "ash"),
+                            ("Destemible Warrior", "KING RIP", "aragorn"), ("Magic Creatures", "CRÁQUEN", "mumia"),
+                            ("Master of Tactics", "MAGNUS", "blue"), ("Ancient Jaw", "SPHYRUS", "megalodonte")):
+    ok = bool(codigos.usar(codigo)) and save.tem_roupa(nome, roupa) and save.usando(nome) == roupa
+    f = roupas.vestir(next(x for x in PERSONAGENS if x["nome"] == nome))
+    p = Partida(f, ALVO, Roteiro([Entrada(5, especial="E")]), Roteiro([]))
+    p.fase = "luta"
+    for _ in range(60):
+        p.passo(None)
+        p.desenhar(tela)
+    Lutador(f, 300, 1).desenhar(tela)
+    checar(ok and f["estilo"] == roupa, f"CÓDIGOS: {codigo.upper()} dá a roupa {f['roupa'].upper()} pro {nome}")
+    save.usar(nome, "padrao")
+p = Partida(roupas.vestir(next(f for f in PERSONAGENS if f["nome"] == "JOHN")), ALVO,
+            Roteiro([Entrada(5, especial="E")]), Roteiro([]))
+p.fase = "luta"
+for _ in range(40):
+    p.passo(None)
+    p.desenhar(tela)
+save.usar("JOHN", "padrao")
 zeus = roupas.vestir(TAMER, "zeus")
 checar(zeus["lobo"] and zeus["lobo"]["tam"] > 1 and roupas.vestir(TAMER, "padrao")["lobo"] is None,
        "CÓDIGOS: na roupa ZEUS o lobo vira o FENRIR (maior, olho vermelho)")
@@ -1608,7 +1799,7 @@ p = Partida(RIBBAT, CANNAN, Roteiro([]), Roteiro([]))
 for _ in range(DURACAO_ENTRADA + 5):
     p.passo(None)
     p.desenhar(tela)
-checar(p.fase in ("intro", "luta") and p.L[0].x == p.L[0].extra["entrada_x"], "RIBBAT: entra pulando")
+checar(p.fase in ("falas", "intro", "luta") and p.L[0].x == p.L[0].extra["entrada_x"], "RIBBAT: entra pulando")
 import ribbat_lutador  # noqa: E402
 checar(RIBBAT["desenho"] is ribbat_lutador.desenhar_ribbat, "RIBBAT: usa o sprite de verdade do jogo dele")
 p = Partida(MAX, RIBBAT, Roteiro([Entrada(5, soco=True)]), Roteiro([]))
@@ -1676,6 +1867,320 @@ def ia_escapa(golpe):
 KING = next(f for f in PERSONAGENS if f["nome"] == "KING RIP")
 esp, normal = ia_escapa(KING["golpes"]["R"]), ia_escapa("soco")
 checar(esp == 0 and normal > 0, f"IA: não dá ESCAPE no meio de especial ({esp}), só em combo de soco/chute ({normal})")
+
+# ---- v2.0: FALAS NA ENTRADA, CHOQUE, REPLAY E MAESTRIA ----
+import random as _r20  # noqa: E402
+_r20.seed(5)
+p = Partida(next(f for f in PERSONAGENS if f["nome"] == "RIB"), next(f for f in PERSONAGENS if f["nome"] == "TAI"),
+            Roteiro([]), Roteiro([]))
+fases, espera_rib, balao_ok = [], False, False
+for _ in range(900):
+    p.passo(None)
+    if not fases or fases[-1] != p.fase:
+        fases.append(p.fase)
+    if p.fase == "falas":
+        espera_rib |= p.L[0].pose_espera == "r_selo"
+        if p.tf % 25 == 0:
+            p.desenhar(tela)
+    if p.fase == "luta":
+        break
+checar(fases[:4] == ["entrada", "falas", "intro", "luta"] and espera_rib,
+       f"ENTRADA: chega, faz a pose de espera (Rib: selo de mão), fala e só depois luta ({fases})")
+checar(all(l.pose_espera is None for l in p.L), "ENTRADA: depois de falar, os dois vão pra pose de luta")
+p = Partida(MAX, ALVO, Roteiro([]), Roteiro([]))
+for _ in range(DURACAO_ENTRADA + 5):
+    p.passo(None)
+p.pular_entrada()
+checar(p.fase == "intro", "ENTRADA: ENTER pula as falas também")
+p = Partida(MAX, ALVO, Roteiro([]), Roteiro([]))
+p.pular_entrada()
+checar(p.fase == "intro", "ENTRADA: ENTER no meio da entrada pula tudo (entrada e falas)")
+# o sorteio da conversa é igual nos dois PCs do ONLINE (usa a semente da luta)
+vistas = []
+for _ in range(2):
+    p = Partida(MAX, next(f for f in PERSONAGENS if f["nome"] == "TRAFO"), Roteiro([]), Roteiro([]))
+    p.semente = 777
+    _r20.seed(len(vistas) * 99)  # (o random de fora diferente nos dois "PCs")
+    while p.fase != "luta":
+        p.passo(None)
+    vistas.append((p.falas_luta, p.t_total))
+checar(vistas[0] == vistas[1], "ENTRADA: no ONLINE os dois PCs sorteiam a mesma conversa (e a luta começa junto)")
+
+import choque  # noqa: E402
+FINN = next(f for f in PERSONAGENS if f["nome"] == "FINN")
+KUN = next(f for f in PERSONAGENS if f["nome"] == "KUN")
+
+
+def choque_de_tiros(aperta0, aperta1):
+    a = [Entrada(5, especial="E")] + [Entrada(5, soco=(k % aperta0 == 0)) if aperta0 else Entrada() for k in range(300)]
+    b = [Entrada(5, especial="E")] + [Entrada(5, soco=(k % aperta1 == 0)) if aperta1 else Entrada() for k in range(300)]
+    p = Partida(FINN, KUN, Roteiro(a), Roteiro(b))
+    p.fase, p.tf = "luta", 0
+    p.L[1].x = p.L[0].x + 420
+    viu = False
+    for _ in range(320):
+        p.passo(None)
+        if p.choque:
+            viu = True
+            if p.choque.t == 40:
+                p.desenhar(tela)
+    return p, viu
+
+
+p, viu = choque_de_tiros(3, 0)
+checar(viu and p.L[1].vida < p.L[1].vida_max and p.L[0].vida == p.L[0].vida_max,
+       f"CHOQUE: os tiros se encontram, quem aperta mais ganha e o tiro dele passa ({p.L[1].vida:.0f})")
+p, viu = choque_de_tiros(0, 3)
+checar(viu and p.L[0].vida < p.L[0].vida_max and p.L[1].vida == p.L[1].vida_max, "CHOQUE: o outro lado também ganha")
+p = Partida(KING, KING, Roteiro([Entrada(5, especial="R")]), Roteiro([Entrada(5, especial="R")]))
+p.fase, p.tf = "luta", 0
+p.L[1].x = p.L[0].x + 80
+viu = False
+for _ in range(60):
+    p.passo(None)
+    viu |= p.choque is not None
+    if viu:
+        break
+checar(viu, "CHOQUE: dois golpes fortes acertando juntos (corpo a corpo) também dá choque")
+p = Partida(KING, next(f for f in PERSONAGENS if f["nome"] == "TAI"), Computador("DIFÍCIL"), Computador("FÁCIL"))
+p.fase = "luta"
+p.choque = choque.Choque(p, (p.L[0].x + 50, CHAO - 60))
+q = 0
+while p.choque and q < 400:
+    p.passo(None)
+    q += 1
+checar(p.choque is None and p.choque_txt and q <= choque.DURACAO + 2,
+       f"CHOQUE: o computador aperta sozinho e o choque termina ({p.choque_txt[0] if p.choque_txt else None})")
+checar(choque.forte(p.L[0]) is False, "CHOQUE: parado não entra em choque")
+
+p = Partida(MAX, ALVO, Computador("DIFÍCIL"), Roteiro([]))
+p.rounds = 1
+for q in range(60 * 120):
+    p.passo(None)
+    if q % 2 == 0:
+        p.desenhar(tela)
+    if p.fase == "fim":
+        break
+checar(p.fase == "fim" and p.msg == "K.O.!" and len(p.replay) > 20 and p.replay_tocando(),
+       "REPLAY: no K.O. final passa o replay dos últimos segundos")
+for _ in range(20):
+    p.desenhar(tela)
+p.pular_replay()
+p.desenhar(tela)
+checar(not p.replay_tocando(), "REPLAY: ENTER pula o replay")
+
+import maestria  # noqa: E402
+save.d()["maestria"] = {}
+checar(maestria.ganhar("RIB", 200) == (1, 3) and maestria.moldura("RIB") == maestria.BRONZE
+       and maestria.titulo("RIB") == "APRENDIZ", "MAESTRIA: 200 pontos = nível 3, moldura de bronze")
+from controles import BonecoTreino as _BT  # noqa: E402
+pt = Partida(MAX, ALVO, Jogador(), _BT(), treino=True)
+checar(maestria.pontos_da_luta(pt, 0) == 0, "MAESTRIA: treino não conta")
+class _JogadorParado(Jogador):  # (um "jogador de verdade" que não aperta nada: o teste não tem teclado)
+    def ler(self, bruto, eu, ele, jogo):
+        return Entrada()
+
+
+p = Partida(MAX, ALVO, _JogadorParado(), Computador("FÁCIL"))
+p.rounds = 1
+p.fase = "luta"
+p.L[1].vida = 0
+for _ in range(400):
+    p.passo(None)
+    if p.fase == "fim":
+        break
+checar(p.fase == "fim" and maestria.xp("MAX-10") > 0 and p.maestria_info and p.maestria_info[0][0] == 0,
+       f"MAESTRIA: ganhar uma luta dá pontos pro lutador de quem jogou ({maestria.xp('MAX-10')})")
+p.tf = 80
+p.pular_replay()
+p.desenhar(tela)
+sel = TelaSelecao(PERSONAGENS)
+sel.desenhar(tela)
+save.d()["maestria"] = {}
+save.salvar()
+
+# ---- CENÁRIO INTERATIVO (v2.0) ----
+import objetos  # noqa: E402
+import cenarios as _cen  # noqa: E402
+checar(all(objetos.criar(n).nome for n in _cen.CENARIOS), "OBJETOS: todo cenário tem um objeto")
+p = Partida(MAX, ALVO, Roteiro([]), Roteiro([]), cenario_nome="DOJO")
+p.fase = "luta"
+o = p.objetos
+p.L[1].x = 480
+v0 = p.L[1].vida
+o.disparar(p, p.L[0], p.L[1])
+for _ in range(120):
+    o.passo(p)
+    if _ % 30 == 0:
+        p.desenhar(tela)
+checar(p.L[1].vida < v0 and not o.pronto, "OBJETOS: o gongo do DOJO deixa tonto e fica gasto")
+p.novo_round()
+checar(p.objetos.pronto, "OBJETOS: no round seguinte o objeto volta")
+for n in _cen.CENARIOS:
+    p = Partida(MAX, ALVO, Roteiro([]), Roteiro([]), cenario_nome=n)
+    p.fase = "luta"
+    p.L[1].x = 480
+    p.objetos.disparar(p, p.L[0], p.L[1])
+    for q in range(90):
+        p.passo(None)
+        if q % 30 == 0:
+            p.desenhar(tela)
+checar(True, "OBJETOS: os 12 disparam e desenham sem erro")
+
+# ---- PERFIL, TROFÉUS E MISSÕES DO DIA (v2.0) ----
+import datetime  # noqa: E402
+import estatisticas  # noqa: E402
+import missoes  # noqa: E402
+import perfil  # noqa: E402
+d = datetime.date(2026, 10, 16)
+checar(missoes.sortear(d) == missoes.sortear(d) and missoes.sortear(d) != missoes.sortear(d + datetime.timedelta(1)),
+       "MISSÕES: 3 por dia, iguais no mesmo dia (e outras amanhã)")
+save.d()["trofeus"] = []
+save.d()["estatisticas"] = {}
+estatisticas.dados()["geral"]["vitorias"] = 1
+checar("PRIMEIRA VITÓRIA" in perfil.trofeus_novos() and "PRIMEIRA VITÓRIA" not in perfil.trofeus_novos(),
+       "TROFÉUS: sai uma vez só")
+save.d()["trofeus"] = []
+save.d()["estatisticas"] = {}
+save.d()["missoes"] = {}
+m0 = save.moedas()
+p = Partida(MAX, ALVO, _JogadorParado(), Computador("FÁCIL"))
+p.rounds = 1
+p.fase = "luta"
+p.L[1].vida = 0
+for _ in range(400):
+    p.passo(None)
+    if p.fase == "fim":
+        break
+g = estatisticas.dados()["geral"]
+checar(g["lutas"] == 1 and g["vitorias"] == 1 and estatisticas.personagem("MAX-10")["vitorias"] == 1,
+       "ESTATÍSTICAS: a luta entra no perfil (1 luta, 1 vitória do MAX-10)")
+checar("PRIMEIRA VITÓRIA" in p.trofeus_ganhos, f"TROFÉUS: a primeira vitória sai no fim da luta ({p.trofeus_ganhos})")
+p.tf = 60
+p.pular_replay()
+p.desenhar(tela)
+pt = Partida(MAX, ALVO, _JogadorParado(), _BT(), treino=True)
+checar(not estatisticas.conta(pt), "ESTATÍSTICAS: treino não conta")
+jogo.tela_atual = "titulo"
+jogo.opcao = luta.PERFIL
+jogo.titulo(pygame.K_RETURN)
+checar(jogo.tela_atual == "perfil", "MENU: PERFIL abre o perfil (estatísticas, troféus e missões)")
+for _ in range(3):
+    jogo.tperfil.desenhar(tela)
+    jogo.tperfil.tecla(pygame.K_d)
+jogo.tperfil.tecla(pygame.K_s)
+jogo.tperfil.tecla(pygame.K_RETURN)
+checar(jogo.tperfil.sair, "PERFIL: VOLTAR volta pro menu")
+jogo.tela_atual = "titulo"
+for k in ("trofeus", "estatisticas", "missoes", "maestria"):
+    save.d()[k] = [] if k == "trofeus" else {}
+save.salvar()
+
+# ---- CRÁQUEN: a ultimate agarra logo (só escapa quem já está no ar) ----
+CRAQ = next(f for f in PERSONAGENS if f["nome"] == "CRÁQUEN")
+acertou = 0
+for dist in (140, 260, 420):
+    p = Partida(CRAQ, ALVO, Roteiro([Entrada(5, especial="Z")]), Roteiro([Entrada(6)] * 300))  # (defendendo)
+    p.fase = "luta"
+    p.L[1].x = p.L[0].x + dist
+    p.L[0].barra = BARRA_MAX
+    for _ in range(260):
+        p.passo(None)
+    acertou += p.L[1].vida <= p.L[1].vida_max - 31
+checar(acertou == 3, f"CRÁQUEN: o NAVIO FANTASMA acerta 32 até em quem defende, de perto e de longe ({acertou} de 3)")
+p = Partida(CRAQ, ALVO, Roteiro([Entrada(5, especial="Z")]), Roteiro([Entrada(8)] + [Entrada(5)] * 100))
+p.fase = "luta"
+p.L[1].x = p.L[0].x + 220
+p.L[0].barra = BARRA_MAX
+for _ in range(260):
+    p.passo(None)
+checar(p.L[1].vida == p.L[1].vida_max, "CRÁQUEN: quem pula na hora escapa do navio")
+p = Partida(CRAQ, ALVO, Roteiro([Entrada(5)] * 130 + [Entrada(5, chute=True)]), Roteiro([]))
+p.fase = "luta"
+p.L[1].x = p.L[0].x + 300
+for _ in range(70):
+    p.passo(None)
+_cedo = bool(p.L[0].extra.get("intangivel"))
+for _ in range(60):
+    p.passo(None)
+checar(not _cedo and p.L[0].extra.get("intangivel"), "CRÁQUEN: parado 2 segundos fica INTANGÍVEL (1 s ainda não)")
+p.L[0].receber(GOLPES["soco"], 1, p.L[1], 1.0)
+checar(p.L[0].vida == p.L[0].vida_max and not p.L[0].extra.get("intangivel"),
+       "CRÁQUEN: o golpe ATRAVESSA (sem dano) e a passiva recarrega")
+
+# ---- RIVAIS e CLIMA (v2.0) ----
+import clima  # noqa: E402
+import rivais  # noqa: E402
+import random as _rnd  # noqa: E402
+JOHN_F = next(f for f in PERSONAGENS if f["nome"] == "JOHN")
+KUN_F = next(f for f in PERSONAGENS if f["nome"] == "KUN")
+checar(rivais.sao_rivais("JOHN", "KUN") and len({tuple(falas.dialogo(JOHN_F, KUN_F, _rnd.Random(s))) for s in range(40)}) == 3,
+       "RIVAIS: John x Kun são rivais e têm 3 conversas de rival")
+vs = TelaVS(JOHN_F, KUN_F)
+for _ in range(40):
+    vs.desenhar(tela)
+save.d()["moedas"] = 0
+p = Partida(JOHN_F, KUN_F, _JogadorParado(), Computador("FÁCIL"))
+p.rounds = 1
+p.fase = "luta"
+p.L[1].vida = 0
+for _ in range(600):
+    p.passo(None)
+    if p.fase == "fim":
+        break
+checar(p.premio and p.premio[2] == 2 * MOEDAS_MULT.get("FÁCIL", 1) and rivais.vitorias("JOHN") == 1,
+       f"RIVAIS: vencer o rival dá moedas em dobro e conta a vitória ({p.premio and p.premio[1]})")
+for nome in cenarios.CENARIOS:
+    p = Partida(MAX, ALVO, Roteiro([Entrada(6)] * 300), Roteiro([]), cenario_nome=nome)
+    p.round, p.fase = 2, "luta"
+    for q in range(240):
+        p.passo(None)
+        if q % 60 == 0:
+            p.desenhar(tela)
+p = Partida(MAX, ALVO, Roteiro([]), Roteiro([]), cenario_nome="SELVA")
+p.round, p.fase = 2, "luta"
+x0 = p.L[0].x
+for _ in range(240):
+    p.passo(None)
+checar(p.clima.ativo and p.L[0].x != x0, "CLIMA: na SELVA, do round 2 a ventania começa e empurra")
+p = Partida(MAX, ALVO, Roteiro([]), Roteiro([]), cenario_nome="SELVA")
+p.fase = "luta"
+for _ in range(240):
+    p.passo(None)
+checar(not p.clima.ativo, "CLIMA: no começo do round 1 o tempo está bom")
+save.d()["rivais"] = {}
+save.salvar()
+
+# ---- FINISH (v2.0): acabou com ULTIMATE -> cena de finalização de cada um ----
+import finish  # noqa: E402
+sem = []
+for f in PERSONAGENS + SECRETOS:
+    p = Partida(f, ALVO, Roteiro([]), Roteiro([]))
+    p.rounds = 1
+    p.fase = "luta"
+    p.L[1].vida, p.L[1].ult_recente = 0, 60
+    fases = set()
+    for q in range(900):
+        p.passo(None)
+        fases.add(p.fase)
+        if p.fase == "finish" and p.tf % 40 == 0:
+            p.desenhar(tela)
+        if p.fase == "fim":
+            break
+    if not ("finish" in fases and p.fase == "fim" and p.L[0].estado == "vitoria"):
+        sem.append(f["nome"])
+checar(not sem, f"FINISH: todo mundo tem a sua cena quando a luta acaba com ULTIMATE (sem: {sem})")
+p = Partida(MAX, ALVO, Roteiro([]), Roteiro([]))
+p.rounds = 1
+p.fase = "luta"
+p.L[1].vida = 0
+fases = set()
+for _ in range(600):
+    p.passo(None)
+    fases.add(p.fase)
+    if p.fase == "fim":
+        break
+checar("finish" not in fases and p.fase == "fim", "FINISH: sem ULTIMATE no final, não tem FINISH")
 
 # ---- EX E ESCAPE DE COMBO ----
 def com_barra(e):
@@ -1903,7 +2408,7 @@ jogo.tela_atual = "titulo"
 checar("ARCADE" not in luta.MODOS and "CPU x CPU" not in luta.MODOS, "MENU: sem ARCADE e sem CPU x CPU")
 jogo.opcao = luta.ONLINE
 jogo.titulo(pygame.K_d)
-checar(luta.MODOS[jogo.opcao] == "CÓDIGOS", "MENU: D vai pra outra coluna")
+checar(jogo.opcao == luta.POR_COLUNA + luta.ONLINE, "MENU: D vai pra outra coluna")
 jogo.opcao = luta.POR_COLUNA
 jogo.titulo(pygame.K_w)
 checar(luta.MODOS[jogo.opcao] == "SAIR", "MENU: W no topo dá a volta na coluna")
@@ -1915,6 +2420,69 @@ jogo.opcao = luta.COMOJOGAR
 jogo.titulo(pygame.K_RETURN)
 checar(jogo.tela_atual == "como", "MENU: COMO JOGAR abre os tutoriais")
 jogo.tcomo.desenhar(tela)
+
+# ---- CONFIGURAÇÕES (v2.0): volume da música, dos efeitos e vibração ----
+jogo.opcao = luta.CONFIG
+jogo.titulo(pygame.K_RETURN)
+checar(jogo.tela_atual == "config", "MENU: CONFIGURAÇÕES abre a tela de configurações")
+tcf = jogo.tconfig
+tcf.desenhar(tela)
+tcf.i = 0
+for _ in range(3):
+    tcf.tecla(pygame.K_a)  # música: 100 -> 70
+tcf.i = 1
+for _ in range(15):
+    tcf.tecla(pygame.K_a)  # efeitos: até o 0 (mudo), não passa
+import som as _som2  # noqa: E402
+checar(save.d()["vol_musica"] == 70 and save.d()["vol_efeitos"] == 0 and abs(_som2.MULT_MUSICA - 0.7) < 1e-9
+       and _som2.MULT_EFEITOS == 0, "CONFIGURAÇÕES: A/D muda o volume (e o 0 é mudo)")
+tcf.mouse(tcf.barra(1).center, True)
+checar(save.d()["vol_efeitos"] == 50, f"CONFIGURAÇÕES: clicar no meio da barra = 50% ({save.d()['vol_efeitos']})")
+tcf.i = 2
+tcf.tecla(pygame.K_RETURN)
+checar(save.d()["vibrar"] is False, "CONFIGURAÇÕES: ENTER desliga a vibração do controle")
+save.carregar()
+checar(save.d()["vol_musica"] == 70 and save.d()["vibrar"] is False, "CONFIGURAÇÕES: fica salvo")
+save.d().update(vol_musica=100, vol_efeitos=100, vibrar=True)
+save.salvar()
+save.d()["combos"] = {"KUN": [0]}
+save.d()["regras"] = ["lua"]
+save.salvar()
+save.carregar()
+checar(save.d()["combos"] == {"KUN": [0]} and save.d()["regras"] == ["lua"],
+       "SAVE: desafios de combo e MODOS MALUCOS também ficam salvos depois de fechar o jogo")
+save.d()["combos"], save.d()["regras"] = {}, []
+save.salvar()
+import json as _json  # noqa: E402
+with open(save.arquivo(), encoding="utf-8") as _a:
+    _d = _json.load(_a)
+_d.update(vol_musica=None, vibrar="sim", moedas=_d.get("moedas", 0))
+with open(save.arquivo(), "w", encoding="utf-8") as _a:
+    _json.dump(_d, _a)
+save.carregar()
+_som2.aplicar_volumes()
+checar(save.d()["vol_musica"] == 100 and save.d()["vibrar"] is True,
+       "SAVE: valor estragado no arquivo (null, texto) volta pro padrão sem quebrar o jogo")
+_som2.aplicar_volumes()
+tcf.i = 3
+tcf.tecla(pygame.K_RETURN)
+tcf.desenhar(tela)
+checar(tcf.sair, "CONFIGURAÇÕES: VOLTAR volta pro menu")
+jogo.tela_atual = "titulo"
+
+# ---- DIÁLOGOS SORTEADOS (v2.0) ----
+import itertools  # noqa: E402
+import random as _rnd  # noqa: E402
+nomes = [f["nome"] for f in PERSONAGENS]
+checar(all(len(falas.conversas(a, b)) >= 2 for a, b in itertools.combinations(nomes, 2)),
+       "FALAS: toda dupla tem pelo menos 2 conversas")
+r = _rnd.Random(1)
+vistas = {tuple(falas.dialogo(MAX, next(f for f in PERSONAGENS if f["nome"] == "TRAFO"), r)) for _ in range(60)}
+checar(len(vistas) == 3, f"FALAS: sorteia uma conversa diferente a cada luta ({len(vistas)} de 3)")
+ok = all(len(falas.dialogo(a, b, r)) == 2 for a in PERSONAGENS for b in PERSONAGENS + SECRETOS)
+checar(ok, "FALAS: toda dupla (até espelho e Ribbat) tem uma conversa de 2 falas")
+checar(all(t == t.upper() for a in PERSONAGENS for b in PERSONAGENS + SECRETOS for l, t in falas.dialogo(a, b, r)
+           if (a, b)[l]["nome"] == "MAX-10"), "FALAS: o MAX-10 sempre fala em MAIÚSCULA (até no espelho e contra o Ribbat)")
 controle_video.CONTROLES[:] = [cf]
 controle_video.usando = "controle"
 jogo.tcomo.desenhar(tela)
@@ -1923,6 +2491,606 @@ controle_video.CONTROLES[:] = []
 jogo.tela_atual = "titulo"
 for _ in range(3):
     jogo.desenhar_titulo()
+
+# =====================================================================
+# MAGNUS (o raptor-robô de fogo)
+# =====================================================================
+MAGNUS = next(f for f in PERSONAGENS if f["nome"] == "MAGNUS")
+
+
+def contra_magnus(passos, passos_alvo=(), distancia=None):
+    p = Partida(MAGNUS, ALVO, Roteiro(passos), Roteiro(passos_alvo))
+    p.fase, p.tf = "luta", 0
+    if distancia:
+        p.L[1].x = p.L[0].x + distancia
+    return p
+
+
+p = contra_magnus([Entrada(5, especial="E")], distancia=250)
+preso = 0
+for _ in range(120):
+    p.passo(None)
+    preso = max(preso, p.L[1].t if p.L[1].estado == "golpeado" else 0)
+checar(dano(p) == 12 and p.L[1].estado != "caido", f"MAGNUS: espinhos da nuca = 6 hits de 2, sem derrubar ({dano(p)})")
+checar(p.L[0].extra["penas"] < 1, "MAGNUS: atirou os espinhos, as penas do pescoço saem (e crescem de novo)")
+p = contra_magnus([Entrada(5, especial="Q")], distancia=90)
+caiu = False
+for _ in range(90):
+    p.passo(None)
+    caiu |= p.L[1].estado == "voando" and p.L[1].malabar
+checar(dano(p) == 10 and caiu, f"MAGNUS: duas rabadas = 2 de 5 e a segunda joga pra cima ({dano(p)})")
+p = contra_magnus([Entrada(5, especial="Q")] + [Entrada()] * 22 + [Entrada(8)] * 10, distancia=90)
+pulou = False
+for _ in range(60):
+    p.passo(None)
+    pulou |= p.L[0].perseguindo > 0
+checar(pulou, "MAGNUS: depois da rabada pro alto dá pra pular atrás (combo aéreo)")
+p = contra_magnus([Entrada(5, especial="R")], distancia=150)
+caiu = False
+for _ in range(150):
+    p.passo(None)
+    caiu |= p.L[1].estado == "caido"
+checar(dano(p) == 20 and caiu, f"MAGNUS: o bote = 10 garradas de 2 e fica caído ({dano(p)})")
+p = contra_magnus([Entrada(5, especial="SHIFT")], distancia=250)
+tonto = False
+for _ in range(90):
+    p.passo(None)
+    tonto |= p.L[1].estado == "tonto"
+checar(dano(p) == 15 and tonto, f"MAGNUS: corrida (5) + rabada de fogo (10) que paralisa ({dano(p)})")
+p = contra_magnus([Entrada(5, especial="Z")], distancia=300)
+p.L[0].barra = BARRA_MAX
+pegou = False
+for _ in range(200):
+    p.passo(None)
+    pegou |= "pegou" in p.L[0].memo
+    if pegou:
+        p.desenhar(tela)
+checar(pegou and dano(p) == 35 and p.L[0].estado != "ataque", f"MAGNUS: bola de fogo (15) + RABADA DE FOGO (20) ({dano(p)})")
+p = contra_magnus([Entrada(5, especial="Z")], [Entrada(6)] * 300, distancia=300)
+p.L[0].barra = BARRA_MAX
+rodar(p, 200)
+checar(dano(p) < 15 and "pegou" not in p.L[0].memo and p.L[0].estado != "ataque",
+       f"MAGNUS: defendendo as bolas de fogo, não tem rabada ({dano(p)})")
+p = Partida(MAGNUS, MAX, Roteiro([]), Roteiro([]))
+for _ in range(200):
+    p.passo(None)
+    p.desenhar(tela)
+checar(p.fase != "entrada", f"MAGNUS: entrada (fogo no canto e farejando) termina ({p.fase})")
+p = Partida(MAGNUS, MAX, Roteiro([]), Roteiro([]))
+p.fase = "luta"
+cm, cx = p.L[0].corpo(), p.L[1].corpo()
+area = (cm.w * cm.h) / (cx.w * cx.h)
+checar(p.L[0].vida_max == 70 and 0.62 <= area <= 0.78 and cm.w >= cx.w and cm.h <= cx.h * 0.66,
+       f"MAGNUS: CORPO ÁGIL = 70 de vida e uns 70% da hitbox (baixinho, não fininho) ({area:.2f})")
+_rb = next(f for f in SECRETOS if f["nome"] == "RIBBAT")
+_pr = Partida(_rb, MAX, Roteiro([]), Roteiro([]))
+_cr = _pr.L[0].corpo()
+checar(_cr.w * _cr.h < cm.w * cm.h, "MAGNUS: só o Ribbat tem a hitbox menor que a dele")
+p = Partida(MAGNUS, MAX, Roteiro([Entrada(6)] * 40), Roteiro([]))
+p.fase = "luta"
+x0 = p.L[0].x
+rodar(p, 20)
+p2 = Partida(XENO, MAX, Roteiro([Entrada(6)] * 40), Roteiro([]))
+p2.fase = "luta"
+x2 = p2.L[0].x
+rodar(p2, 20)
+checar(abs((p.L[0].x - x0) / (p2.L[0].x - x2) - 4.3 * _hab.AGIL_VEL / 4.2) < 0.05, f"MAGNUS: CORPO ÁGIL anda {round((_hab.AGIL_VEL - 1) * 100)}% mais rápido")
+# ---- ROLAMENTO (M1 + M2 juntos) ----
+p = partida_com(Roteiro([Entrada(6, soco=True, chute=True)]), Roteiro([]))
+p.L[1].x = p.L[0].x + 90
+x0 = p.L[0].x
+rolou = invencivel = False
+for _ in range(30):
+    p.passo(None)
+    rolou |= p.L[0].estado == "rolando"
+    invencivel |= p.L[0].estado == "rolando" and p.L[0].corpo() is None
+checar(rolou and invencivel and p.L[0].x > p.L[1].x, f"ROLAMENTO: M1+M2 segurando FRENTE rola pra frente, invencível, passando pelo outro ({int(p.L[0].x - x0)} px)")
+p = partida_com(Roteiro([Entrada(5, soco=True), Entrada(5), Entrada(5, chute=True)]), Roteiro([]))
+x0 = p.L[0].x
+rodar(p, 30)
+checar(p.L[0].x < x0 - 60 and p.L[0].estado == "parado", f"ROLAMENTO: M1 e logo M2 (sem direção) rola pra trás ({int(p.L[0].x - x0)} px)")
+p = partida_com(Roteiro([Entrada(5, soco=True)] + [Entrada()] * 9 + [Entrada(5, chute=True)]), Roteiro([]))
+viu = False
+for _ in range(30):
+    p.passo(None)
+    viu |= p.L[0].estado == "rolando"
+checar(not viu, "ROLAMENTO: soco e chute separados (combo normal) NÃO rolam")
+p = partida_com(Roteiro([Entrada(5, soco=True, chute=True)] + [Entrada()] * 26 + [Entrada(5, soco=True, chute=True)]), Roteiro([]))
+duas = 0
+for _ in range(40):
+    antes = p.L[0].estado
+    p.passo(None)
+    duas += antes != "rolando" and p.L[0].estado == "rolando"
+checar(duas == 1, "ROLAMENTO: tem um tempinho de espera antes de rolar de novo")
+
+import finish as _fin  # noqa: E402
+# =====================================================================
+# SPHYRUS (tubarão-martelo + mosassauro)
+# =====================================================================
+SPHYRUS = next(f for f in PERSONAGENS if f["nome"] == "SPHYRUS")
+
+
+def contra_sphyrus(passos, passos_alvo=(), distancia=None, hab_=None, alvo=None):
+    f = dict(SPHYRUS, habilidade=hab_ or "eletro")
+    p = Partida(f, alvo or ALVO, Roteiro(passos), Roteiro(passos_alvo))
+    p.fase, p.tf = "luta", 0
+    if distancia:
+        p.L[1].x = p.L[0].x + distancia
+    return p
+
+
+checar(SPHYRUS["vida"] == 80, "SPHYRUS: 80 de vida (vidro que bate forte)")
+p = contra_sphyrus([Entrada(5, especial="E")], distancia=300)
+rodar(p, 80)
+checar(dano(p) == 14, f"SPHYRUS: onda de ar = 14 ({dano(p)})")
+p = contra_sphyrus([Entrada(5, especial="Q")], distancia=90)
+alto = 0
+for _ in range(80):
+    p.passo(None)
+    alto = max(alto, CHAO - p.L[1].y)
+checar(dano(p) == 15 and alto > 60, f"SPHYRUS: martelada = 15 e joga pra cima ({dano(p)}, {int(alto)} px)")
+p = contra_sphyrus([Entrada(5, especial="R")], distancia=90)
+rodar(p, 70)
+checar(dano(p) == 24, f"SPHYRUS: corte em X = 2 hits de 12 ({dano(p)})")
+p = contra_sphyrus([Entrada(5, especial="SHIFT")], distancia=260)
+intangivel = False
+for _ in range(110):
+    p.passo(None)
+    intangivel |= p.L[0].corpo() is None and p.L[0].estado == "ataque"
+checar(dano(p) == 10 and intangivel, f"SPHYRUS: mergulho passa por baixo da terra e morde = 10 ({dano(p)})")
+p = contra_sphyrus([Entrada(5, especial="Z")], distancia=250)
+p.L[0].barra = BARRA_MAX
+for _ in range(260):
+    p.passo(None)
+    if "pegou" in p.L[0].memo:
+        p.desenhar(tela)
+checar(dano(p) == 45 and p.L[0].s == SPHYRUS["tam"] and p.L[0].estado != "ataque",
+       f"SPHYRUS: O MAR = 45 e ele volta pro tamanho normal ({dano(p)})")
+# passivas
+import habilidades as _hb  # noqa: E402
+CRAQ = next(f for f in PERSONAGENS if f["nome"] == "CRÁQUEN")
+p = contra_sphyrus([Entrada()] * 5 + [Entrada(5, soco=True)], alvo=CRAQ, distancia=90)
+p.L[1].extra["intangivel"] = True
+rodar(p, 30)
+checar(p.L[1].vida < p.L[1].vida_max, "SPHYRUS: ELETRORRECEPÇÃO acerta o Cráquen intangível")
+p = contra_sphyrus([], [Entrada(5, especial="E")], distancia=300)
+achou = 0
+for _ in range(20):
+    p.passo(None)
+    achou = max(achou, p.L[0].extra.get("sente", 0))
+p.L[0].r_antes, p.L[0].r = 5, 5
+p.L[0].parry_trava = 0
+checar(achou > 0 and _hb.mult_parry(p.L[0]) == 2, "SPHYRUS: ELETRORRECEPÇÃO sente o especial e o parry fica 2x")
+
+
+class _Nadador:
+    def __init__(self, n_anda):
+        self.n = 0
+        self.n_anda = n_anda
+
+    def ler(self, keys, eu, ele, jogo):
+        self.n += 1
+        e = Entrada(6 if 3 < self.n < self.n_anda else 5, soco=self.n == 20)
+        e.lobo = self.n == 2
+        return e
+
+
+p = Partida(dict(SPHYRUS, habilidade="natacao"), ALVO, _Nadador(70), Roteiro([]))
+p.fase, p.tf = "luta", 0
+p.L[1].x = p.L[0].x + 120
+nadou = derrubou = False
+for _ in range(90):
+    p.passo(None)
+    nadou |= bool(p.L[0].extra.get("nadando")) and p.L[0].corpo() is None
+    derrubou |= p.L[1].estado in ("voando", "caido")
+checar(nadou and derrubou and dano(p) == 8, f"SPHYRUS: NATAÇÃO = intangível, não soca, passar por baixo dá 8 e derruba ({dano(p)})")
+p = Partida(dict(SPHYRUS, habilidade="natacao"), ALVO, _Nadador(3), Roteiro([]))
+p.fase, p.tf = "luta", 0
+rodar(p, 8 * FPS + 30)
+checar(not p.L[0].extra.get("nadando") and p.L[0].extra.get("nada_recarga", 0) > 0,
+       "SPHYRUS: NATAÇÃO dura no máximo 8 s e depois recarrega")
+p = contra_sphyrus([Entrada()] * 3 + [Entrada(5, especial="R")], distancia=90, hab_="frenesi")
+p.L[1].vida_max = 200
+p.L[1].vida = p.L[1].vida_max * 0.35
+v0 = p.L[1].vida
+rodar(p, 80)
+checar(p.L[0].extra.get("frenesi") and abs((v0 - p.L[1].vida) - 48) < 0.01 and _hb.mult_vel(p.L[0]) >= 1.3,
+       f"SPHYRUS: FRENESI = dano x2 e +30% de velocidade ({v0 - p.L[1].vida:.0f})")
+p = contra_sphyrus([], distancia=200)
+import cenarios as _cn  # noqa: E402
+p.cena = _cn.cenario("PRAIA DA ILHA")
+rodar(p, 2)
+checar(abs(_hb.mult_vel(p.L[0]) - 1.1) < 0.001, "SPHYRUS: BÔNUS NA ÁGUA (na praia anda 10% mais rápido)")
+p = Partida(SPHYRUS, MAX, Roteiro([]), Roteiro([]))
+for _ in range(220):
+    p.passo(None)
+    p.desenhar(tela)
+checar(p.fase != "entrada", f"SPHYRUS: entrada (barbatana + rugidão) termina ({p.fase})")
+checar(_fin.FINISHES.get("SPHYRUS", {}).get("nome") == "VIROU ISCA!", "SPHYRUS: FINISH = VIROU ISCA!")
+# =====================================================================
+# 2ª ULTIMATE (barra AMARELA)
+# =====================================================================
+import ult2 as _u2  # noqa: E402
+P2 = {f["nome"]: f for f in PERSONAGENS}
+checar(all("Z2" in f["golpes"] for f in PERSONAGENS) and "Z2" not in next(f for f in SECRETOS if f["nome"] == "RIBBAT")["golpes"],
+       "2ª ULTIMATE: todo mundo tem (menos o Ribbat: NÃO PRECISA)")
+p = Partida(P2["MAX-10"], P2["TAI"], Roteiro([]), Roteiro([]))
+p.fase = "luta"
+l0 = p.L[0]
+l0.encher(5000)
+checar(l0.barra == BARRA_TOTAL, f"2ª ULTIMATE: a barra continua enchendo em AMARELO (metade do tamanho) ({l0.barra})")
+l0.barra = BARRA_MAX + 300
+l0.comecar(l0.golpe_do_botao("Z"))
+checar(l0.barra == 300, f"2ª ULTIMATE: usar a 1ª gasta só a azul (o amarelo desce) ({l0.barra})")
+l0.mudar("parado")
+l0.barra = BARRA_MAX + 300
+checar(not l0.comecar("max_ult2"), "2ª ULTIMATE: com a amarela pela metade não sai")
+l0.barra = BARRA_MAX
+l0.bonus_amarelo(BONUS_COMBO)
+checar(l0.barra == BARRA_MAX + BONUS_COMBO, "2ª ULTIMATE: jogada boa (combo 5+, choque, objeto) enche a amarela")
+l0.barra = 200
+l0.bonus_amarelo(BONUS_COMBO)
+checar(l0.barra == 200, "2ª ULTIMATE: o bônus só vale com a azul cheia")
+_rb2 = Partida(next(f for f in SECRETOS if f["nome"] == "RIBBAT"), MAX, Roteiro([]), Roteiro([]))
+_rb2.L[0].encher(5000)
+checar(_rb2.L[0].barra == BARRA_MAX, "2ª ULTIMATE: a barra do Ribbat para na azul (NÃO PRECISA)")
+p = Partida(P2["MAX-10"], P2["TAI"], Roteiro([Entrada()] * 3 + [Entrada(5, especial="Z", )]), Roteiro([]))
+p.fase = "luta"
+p.L[0].barra = BARRA_TOTAL
+p.L[0].ex_pedido = False
+import rede as _rede  # noqa: E402
+_e = Entrada(5, especial="Z2")
+checar(_rede.decodifica(_rede.codifica(_e)).especial == "Z2", "2ª ULTIMATE: o botão vai pelo online")
+
+
+def contra_ult2(nome, alvo="TAI", hab_=None, cena=None, quadros=900):
+    f = dict(P2[nome], habilidade=hab_ or P2[nome].get("habilidade"))
+    p = Partida(f, P2[alvo], Roteiro([Entrada()] * 3 + [Entrada(5, especial="Z2")]), Roteiro([]))
+    p.fase, p.tf = "luta", 0
+    if cena:
+        import cenarios as _c
+        p.cena = _c.cenario(cena)
+    p.L[1].x = p.L[0].x + 200
+    p.L[0].barra = BARRA_TOTAL
+    v0 = p.L[1].vida
+    saiu = False
+    for i in range(quadros):
+        p.passo(None)
+        saiu |= p.L[0].nome_golpe == f["golpes"]["Z2"]
+        if i % 9 == 0:
+            p.desenhar(tela)
+    return p, saiu, v0 - p.L[1].vida
+
+
+for nome, esperado, extra in (("MAX-10", 45, {}), ("RIB", 50, {}), ("KING RIP", 55, {}), ("CANNAN", 55, {}),
+                              ("KUN", 55, {}), ("TAI", 45, dict(alvo="RIB")), ("JOHN", 55, {}),
+                              ("CRÁQUEN", 60, dict(cena="PRAIA DA ILHA")),
+                              ("SPHYRUS", 65, dict(hab_="natacao")), ("SPHYRUS", 60, dict(hab_="eletro")),
+                              ("SPHYRUS", 60, dict(hab_="frenesi"))):
+    p, saiu, d = contra_ult2(nome, **extra)
+    checar(saiu and abs(d - esperado) < 0.6 and p.L[0].estado != "ataque",
+           f"2ª ULTIMATE: {nome} {extra.get('hab_', '')} tira {esperado} ({d:.1f})")
+p, saiu, d = contra_ult2("CANNAN")
+checar(abs(p.L[0].vida - (p.L[0].vida_max - 10)) < 0.01, f"2ª ULTIMATE: o coice da MINIGUN tira 10 do Cannan ({p.L[0].vida:.1f})")
+p, saiu, d = contra_ult2("TRAFO")
+checar(saiu and abs(d - 60) < 0.6, f"2ª ULTIMATE: TRAFO braços de terra, parado leva todos = 60 ({d:.1f})")
+p, saiu, d = contra_ult2("CRÁQUEN", cena="TEMPLO", quadros=5 * 5 * FPS + 200)
+checar(saiu and abs(d - 50) < 0.6, f"2ª ULTIMATE: CRÁQUEN sem água = 5 marujos, 1 hit a cada 5 s ({d:.1f})")
+p, saiu, d = contra_ult2("FINN", quadros=220)
+checar(saiu and d == 15 and p.L[0].extra.get("golem", 0) > 0, f"2ª ULTIMATE: FINN chama o golem (soco de 15, e ele fica) ({d})")
+for nome, chave in (("TROMOS", "cacada"), ("TAMER", "lobisomem"), ("MAGNUS", "fornalha")):
+    p, saiu, d = contra_ult2(nome, quadros=260)
+    checar(saiu and p.L[0].extra.get(chave, 0) > 0, f"2ª ULTIMATE: {nome} liga o {chave.upper()} por 10 s")
+_stuns = []
+for _forn in (0, 100):
+    p = Partida(P2["MAGNUS"], P2["RIB"], Roteiro([]), Roteiro([]))
+    p.fase = "luta"
+    p.L[0].extra["fornalha"] = _forn
+    p.L[1].receber(GOLPES["soco"], 1, p.L[0], 1.0)
+    _stuns.append((p.L[1].stun, p.L[1].vida))
+checar(_stuns[1][0] > _stuns[0][0] and _stuns[1][1] < _stuns[0][1],
+       f"2ª ULTIMATE: MODO FORNALHA queima (mais dano) e PRENDE (mais tempo) ({_stuns})")
+
+# ---- DIA E NOITE (periodo.py) ----
+import periodo as _per  # noqa: E402
+import random as _rnd2  # noqa: E402
+checar(_per.criar("SELVA", _rnd2.Random(5)).nome == _per.criar("SELVA", _rnd2.Random(5)).nome
+       and isinstance(_per.criar("DOJO"), _per.Nada), "DIA/NOITE: igual com a mesma semente; lugar fechado não muda")
+_pa, _pb = (Partida(MAX, P2["TAI"], Roteiro([]), Roteiro([])) for _ in range(2))
+_pa.semente = _pb.semente = 1234
+_estado = _rnd2.getstate()
+checar(_pa.periodo_atual().nome == _pb.periodo_atual().nome and _rnd2.getstate() == _estado,
+       "DIA/NOITE: no online os dois PCs sorteiam igual (e não mexe no random da luta)")
+_pa.desenhar(tela)
+
+# ---- REI DA ARENA ----
+import reiarena as _rei  # noqa: E402
+_a = _rei.ReiArena(["A", "B", "C"])
+_a.registrar(0)
+_a.registrar(1)
+checar(_a.rei == "C" and _a.fila == ["B", "A"] and _a.sequencia == 1,
+       "REI DA ARENA: quem ganha fica, quem perde vai pro fim da fila")
+jogo.modo = luta.REI
+jogo.arena = _rei.ReiArena(["ANA", "BIA"])
+jogo.tplacar = _rei.TelaPlacar(jogo.arena)
+jogo.tela_atual = "rei_placar"
+jogo.tplacar.desenhar(tela)
+jogo.evento_rei(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN, unicode="", mod=0, scancode=0))
+checar(jogo.tela_atual == "escolha" and "ANA" in (jogo.sel.titulo or ""),
+       "REI DA ARENA: do placar vai pra escolha (REI x DESAFIANTE)")
+jogo.sel.desenhar(tela)
+jogo.tela_atual = "titulo"
+jogo.modo = luta.UM
+
+# ---- LOJA NOVA (entradas, vitórias e provocações) ----
+import extras as _ex  # noqa: E402
+import tai as _tai  # noqa: E402
+from loja import TelaLoja as _TL  # noqa: E402
+_ex.registrar("entradas", "MAX-10", id="teste", nome="TESTE", preco=30, entrada=_tai.entrada)
+_ex.registrar("provocacoes", "MAX-10", id="teste", nome="TESTE", preco=30, provocacao="TESTE!")
+save.d()["moedas"] = 100
+_lj = _TL(PERSONAGENS)
+for _c in range(len(_ex.CATEGORIAS)):
+    _lj.cat, _lj.j = _c, len(_lj.itens()) - 1
+    for _ in range(3):
+        _lj.desenhar(tela)
+_lj.cat = 1
+_lj.j = [i["id"] for i in _lj.itens()].index("teste")
+_lj.confirmar()
+_f = roupas.vestir(MAX)
+checar(_ex.usando("entradas", "MAX-10") == "teste" and _f["entrada"] is _tai.entrada and save.moedas() == 70,
+       "LOJA NOVA: compra uma ENTRADA e o seu lutador entra com ela")
+checar(roupas.vestir(MAX, "padrao").get("entrada") is MAX.get("entrada"), "LOJA NOVA: o computador entra com a original")
+_lj.cat = 3
+_lj.j = [i["id"] for i in _lj.itens()].index("teste")
+_lj.confirmar()
+_p = Partida(roupas.vestir(MAX), P2["TAI"], Roteiro([Entrada()] * 2 + [Entrada(5)]), Roteiro([]))
+_p.fase = "luta"
+_p.L[0].comecar("provocar")
+for _ in range(10):
+    _p.passo(None)
+    _p.desenhar(tela)
+checar(_p.L[0].f["provocacao"] == "TESTE!", "LOJA NOVA: a provocação comprada aparece na luta")
+for _cat in ("entradas", "provocacoes"):  # (tira os itens de teste)
+    _ex.CATALOGO[_cat]["MAX-10"] = [i for i in _ex.CATALOGO[_cat]["MAX-10"] if i["id"] != "teste"]
+    save.d()["extras_usando"][_cat]["MAX-10"] = "padrao"
+
+# ---- PROVOCAÇÕES DA LOJA (2 por lutador) ----
+_n_prov = 0
+_tudo_ok = True
+_P3 = {f["nome"]: f for f in PERSONAGENS + list(SECRETOS)}
+for _nome, _itens in _ex.CATALOGO["provocacoes"].items():
+    for _it in _itens:
+        _f = _ex.aplicar(dict(_P3[_nome]), _nome, {"provocacoes": _it["id"]})
+        _pp = Partida(_f, P2["TAI"] if _nome != "TAI" else P2["RIB"], Roteiro([]), Roteiro([]))
+        _pp.fase = "luta"
+        _pp.L[1].x = _pp.L[0].x + 220
+        _pp.passo(None)
+        _pp.L[0].comecar("provocar")
+        for _i in range(PROVOCA_TEMPO + 30):
+            _pp.passo(None)
+            if _i % 10 == 0:
+                _pp.desenhar(tela)
+        _tudo_ok &= not _pp.L[0].extra.get("prov_vis") and not _pp.L[0].esconde and _pp.L[0].barra > 0
+        _n_prov += 1
+checar(_tudo_ok and _n_prov == 32 + 5, f"LOJA: as {_n_prov} provocações novas (32 + 5 de Halloween) rodam e o lutador volta ao normal")
+_f = _ex.aplicar(dict(_P3["TROMOS"]), "TROMOS", {"provocacoes": "teto"})
+_pp = Partida(_f, P2["TAI"], Roteiro([]), Roteiro([Entrada()] * 20 + [Entrada(5, soco=True)]))
+_pp.fase = "luta"
+_pp.L[1].x = _pp.L[0].x + 70
+_pp.passo(None)
+_pp.L[0].comecar("provocar")
+for _ in range(60):
+    _pp.passo(None)
+checar(not _pp.L[0].esconde and not _pp.L[0].extra.get("prov_vis"),
+       "LOJA: apanhou no meio da provocação (sumiu pro teto): volta a aparecer normal")
+
+# ---- POSES DE VITÓRIA DA LOJA (2 por lutador) ----
+_n_vit = 0
+for _nome, _itens in _ex.CATALOGO["vitorias"].items():
+    for _it in _itens:
+        _f = _ex.aplicar(dict(_P3[_nome]), _nome, {"vitorias": _it["id"]})
+        _pp = Partida(_f, P2["TAI"] if _nome != "TAI" else P2["RIB"], Roteiro([]), Roteiro([]))
+        _pp.fase = "luta"
+        _pp.passo(None)
+        _pp.L[0].mudar("vitoria")
+        _pp.L[1].mudar("caido")
+        for _i in range(160):
+            _pp.L[0].update(Entrada(), _pp.L[1], _pp)
+            _pp.L[0].animar()
+            if _i % 20 == 0:
+                _pp.desenhar(tela)
+        _n_vit += 1
+checar(_n_vit == 30, f"LOJA: as {_n_vit} poses de vitória novas rodam (repetindo) sem quebrar")
+
+# ---- ENTRADAS DA LOJA (2 por lutador) ----
+_n_ent = 0
+_ent_ok = True
+for _nome, _itens in _ex.CATALOGO["entradas"].items():
+    for _it in _itens:
+        _f = _ex.aplicar(dict(_P3[_nome]), _nome, {"entradas": _it["id"]})
+        _pp = Partida(_f, P2["TAI"] if _nome != "TAI" else P2["RIB"], Roteiro([]), Roteiro([]))
+        for _i in range(DURACAO_ENTRADA + 5):
+            _pp.passo(None)
+            if _i % 15 == 0:
+                _pp.desenhar(tela)
+        _l = _pp.L[0]
+        _ent_ok &= (_l.x, _l.y, _l.esconde, _l.angulo, _l.s) == (_l.extra["entrada_x"], CHAO, False, 0, _l.f["tam"])
+        _n_ent += 1
+checar(_ent_ok and _n_ent == 30, f"LOJA: as {_n_ent} entradas novas rodam e terminam com ele no lugar")
+
+# =====================================================================
+# FRIGANTUS (o yeti gigantopiteco, 15º)
+# =====================================================================
+FRIG = P2["FRIGANTUS"]
+
+
+def contra_frig(passos, alvo="TAI", distancia=200, quadros=200, barra=0):
+    p = Partida(FRIG, P2[alvo], Roteiro([Entrada()] * 3 + passos), Roteiro([]))
+    p.fase, p.tf = "luta", 0
+    p.L[1].x = p.L[0].x + distancia
+    p.L[0].barra = barra
+    p.L[1].extra["subst_espera"] = 10 ** 6  # (sem a substituição do Rib)
+    v0 = p.L[1].vida
+    congelou = False
+    for i in range(quadros):
+        p.passo(None)
+        congelou |= bool(getattr(p.L[1], "congelado", False))
+        if i % 9 == 0:
+            p.desenhar(tela)
+    return p, v0 - p.L[1].vida, congelou
+
+
+checar(FRIG["vida"] == 120 and FRIG["habilidade"] == "nevasca", "FRIGANTUS: 120 de vida e a passiva NEVASCA")
+p, d, cong = contra_frig([Entrada(5, especial="E")], distancia=300)
+checar(abs(d - 10) < 0.01 and cong, f"FRIGANTUS: bola de neve = 10 e CONGELA ({d:.1f})")
+p, d, cong = contra_frig([Entrada(5, especial="Q")], distancia=110, quadros=90)
+checar(abs(d - 12) < 0.01, f"FRIGANTUS: pisão com estacas de gelo = 12 ({d:.1f})")
+p, d, cong = contra_frig([Entrada(5, especial="R")], alvo="RIB", distancia=220, quadros=160)
+checar(d >= 14 and p.L[1].x in (PAREDE_E, PAREDE_D) or d >= 14, f"FRIGANTUS: as 8 estacas na cabeça ({d:.1f})")
+p, d, cong = contra_frig([Entrada(5, especial="SHIFT")], distancia=240, quadros=90)
+checar(abs(d - 10) < 0.01, f"FRIGANTUS: escorregão = 10 ({d:.1f})")
+p, d, cong = contra_frig([Entrada(5, especial="Z")], quadros=220, barra=BARRA_MAX)
+checar(abs(d - 40) < 0.01, f"FRIGANTUS: AVALANCHE = 40 ({d:.1f})")
+p, d, cong = contra_frig([Entrada(5, especial="Z2")], quadros=420, barra=BARRA_TOTAL)
+checar(abs(d - 60) < 0.01 and p.cena.nome != "MONTANHA NEVADA" and p.cutscene is None,
+       f"FRIGANTUS: ERA DO GELO = 60 e a luta continua 3 cenários depois ({d:.1f}, {p.cena.nome})")
+checar(p.stats["ults2"] == 0 and p.L[0].acertou_ult2, "2ª ULTIMATE: conta quem acertou (pro troféu PODER MÁXIMO)")
+_pp = Partida(FRIG, P2["RIB"], Roteiro([]), Roteiro([]))
+_pp.fase = "luta"
+_alvo = _pp.L[1]
+for _ in range(3):
+    _alvo.mudar("parado")
+    _alvo.receber(GOLPES["soco"], 1, _pp.L[0], 1.0)
+checar(getattr(_alvo, "congelado", False), "FRIGANTUS: NEVASCA = 3 golpes seguidos CONGELA")
+_pp2 = Partida(FRIG, P2["RIB"], Roteiro([]), Roteiro([]))
+_pp2.L[1].receber(GOLPES["soco"], 1, _pp2.L[0], 1.0)
+import habilidades as _hb2  # noqa: E402
+checar(_hb2.mult_vel(_pp2.L[1]) < 1.0, "FRIGANTUS: NEVASCA = cada golpe deixa mais lento")
+
+import save as _sv  # noqa: E402
+checar(_sv._renomear({"usando": {"XENOMORPH": "fogo"}, "trofeus": ["SOMBRA DO XENOMORPH"]})
+       == {"usando": {"TROMOS": "fogo"}, "trofeus": ["SOMBRA DO TROMOS"]},
+       "SAVE: o save antigo do XENOMORPH passa pro TROMOS (ninguém perde roupa nem maestria)")
+import finish as _fin  # noqa: E402
+checar(_fin.FINISHES.get("MAGNUS", {}).get("nome") == "TOSTADO!", "MAGNUS: FINISH = TOSTADO!")
+
+# ---- EVENTOS (Halloween) ----
+import datetime  # noqa: E402
+import eventos as _ev  # noqa: E402
+checar(_ev.evento_atual(datetime.date(2026, 10, 30)) == "HALLOWEEN" and _ev.evento_atual(datetime.date(2026, 11, 5)) is None
+       and _ev.pascoa(2027) == datetime.date(2027, 3, 28), "EVENTOS: calendário")
+_hw = [(n, r["id"]) for n, lista in roupas.ROUPAS.items() for r in lista if r.get("evento") == "halloween"]
+checar(len(_hw) == 5, f"HALLOWEEN: as 5 skins do passe ({_hw})")
+for _n, _rid in _hw:  # cada skin desenha sem quebrar (parada e atacando)
+    _f = roupas.vestir(next(f for f in PERSONAGENS if f["nome"] == _n), _rid)
+    _p = Partida(_f, PERSONAGENS[1], Roteiro([Entrada(5, especial="Q")]), Roteiro([]))
+    _p.fase = "luta"
+    for _ in range(20):
+        _p.passo(None)
+    _p.desenhar(pygame.display.get_surface())
+checar(True, "HALLOWEEN: as 5 skins desenham")
+import loja as _lj  # noqa: E402
+_tl = _lj.TelaLoja(PERSONAGENS)
+_tl.i = next(i for i, f in enumerate(PERSONAGENS) if f["nome"] == "RIB")
+checar(not any(r.get("evento") for r in _tl.itens()), "HALLOWEEN: a loja não mostra a skin do passe pra quem não ganhou")
+_sv.d()["doces"] = 1
+import extras as _ex  # noqa: E402
+_hwp = [(n, i["id"]) for n, lista in _ex.CATALOGO["provocacoes"].items() for i in lista if i.get("evento")]
+checar(len(_hwp) == 5 and not any(_ex.tem("provocacoes", n, i) for n, i in _hwp),
+       f"HALLOWEEN: 5 provocações do passe (só com o passe) ({_hwp})")
+for _n, _i in _hwp:  # cada uma roda inteira e desenha (e não deixa o lutador sumido no fim)
+    _f = _ex.aplicar(next(f for f in PERSONAGENS if f["nome"] == _n), _n, {"provocacoes": _i})
+    _p = Partida(_f, PERSONAGENS[1], Roteiro([]), Roteiro([]))
+    _p.fase = "luta"
+    _p.passo(None)
+    _p.L[0].comecar("provocar")
+    for _ in range(PROVOCA_TEMPO + 4):
+        _p.passo(None)
+        _p.desenhar(pygame.display.get_surface())
+    checar(not _p.L[0].esconde and not _p.L[0].extra.get("prov_vis"), f"HALLOWEEN: provocação {_n} {_i} termina limpa")
+import narrador as _nar  # noqa: E402
+_n0 = _nar.Narrador()
+_pn = Partida(PERSONAGENS[0], PERSONAGENS[1], Roteiro([]), Roteiro([]))
+_pn.fase = "luta"
+_n0.passo(_pn)
+_pn.L[0].combo = 10
+_n0.passo(_pn)
+checar(("combo", 0) in _n0.historico, "NARRADOR: combo de 10 = COMBO INSANO")
+# ---- NATAL (meias e gorrinho) ----
+import natal as _nt  # noqa: E402
+_pz = Partida(PERSONAGENS[0], PERSONAGENS[1], Roteiro([]), Roteiro([]))
+checar(_nt.criar(_pz, datetime.date(2026, 10, 18)) is None and _nt.criar(_pz, datetime.date(2026, 12, 22)) is not None,
+       "NATAL: a meia só existe no Natal")
+_dn = datetime.date(2026, 12, 22)
+for _lado, _quer in ((0, True), (1, False)):  # golpe do JOGADOR pega; golpe do CPU só balança
+    _pz = Partida(PERSONAGENS[0], PERSONAGENS[1], Roteiro([]), Roteiro([]))
+    _pz.fase = "luta"
+    _pz.lado_humano = 0
+    _pz.meia = _nt.Meia(_pz.cena.nome, _dn)
+    _pz.passo(None)
+    _l = _pz.L[_lado]
+    _l.estado = "ataque"
+    _l.caixa_golpe = lambda c=_pz.meia.caixa(): c
+    _pz.meia.passo(_pz)
+    checar(_pz.meia.pega == _quer and (_quer or _pz.meia.balanca > 0),
+           f"NATAL: golpe do {'jogador pega' if _quer else 'CPU só balança'} a meia")
+_sv.d()["natal"] = {}
+# ---- CUTSCENES DA LOJA ----
+import cenas_loja as _cl  # noqa: E402
+_ok_c, _n_c = True, 0
+for _cat, _tipo in (("vitorias", "vitoria"), ("entradas", "entrada")):
+    for _n, _lista in _ex.CATALOGO[_cat].items():
+        for _it in _lista:
+            if not _it.get(_tipo + "_cutscene"):
+                continue
+            _f = _ex.aplicar(dict(_P3[_n]), _n, {_cat: _it["id"]})
+            _c = _cl.criar(_f, _tipo, PERSONAGENS[1])
+            _ok_c &= _c.total <= _cl.DURACAO_MAX
+            for _q in range(_c.total):
+                if _q % 40 == 0:
+                    _c.desenhar(tela)
+                _c.passo()
+            _ok_c &= _c.acabou
+            _n_c += 1
+checar(_ok_c and _n_c == 30, f"CUTSCENES: as {_n_c} cenas (15 vitórias + 15 entradas) rodam até o fim em até 6 s")
+import dis as _dis  # noqa: E402
+import entradas_loja as _el  # noqa: E402
+import vitorias_loja as _vl  # noqa: E402
+_anime = {v.split(":")[0] for v in list(_el.ANIME.values()) + list(_vl.ANIME.values())}
+_no_exe = {i.argval for i in _dis.get_instructions(_cl._pro_exe) if i.opname == "IMPORT_NAME"}
+checar(_anime <= _no_exe and _anime <= set(_cl.CENAS_ANIME),
+       f"CUTSCENES: toda cena de anime está no _pro_exe (senão fica FORA do BattleWish.exe) ({sorted(_anime - _no_exe) or 'ok'})")
+_fc = _ex.aplicar(dict(_P3["MAX-10"]), "MAX-10", {"entradas": "capsula"})
+_pc = Partida(_fc, PERSONAGENS[1], Roteiro([]), Roteiro([]))
+_pc.lados_humanos = lambda: [0]
+_pc.passo(None)
+_tem = _pc.cena_loja is not None
+_pc.pular_entrada()  # (não pode pular)
+_nao_pulou = _pc.cena_loja is not None and _pc.fase == "entrada"
+for _ in range(_cl.DURACAO_MAX + DURACAO_ENTRADA + 10):
+    _pc.passo(None)
+checar(_tem and _nao_pulou and _pc.cena_loja is None and _pc.fase != "entrada"
+       and abs(_pc.L[0].x - _pc.L[0].extra.get("entrada_x", _pc.L[0].x)) < 1 and not _pc.L[0].esconde,
+       "CUTSCENES: a entrada da loja passa antes da luta, não pula com ENTER e ele fica no lugar")
+_pc2 = Partida(_fc, PERSONAGENS[1], Roteiro([]), Roteiro([]))
+_pc2.passo(None)
+checar(_pc2.cena_loja is None, "CUTSCENES: o computador (e o online) não têm cena")
+_m0 = _sv.moedas()
+checar(_ev.converter_sobras(datetime.date(2026, 11, 20)) == 5 and _sv.moedas() == _m0 + 5 and _ev.doces() == 0,
+       "HALLOWEEN: depois do evento, os doces que sobraram viram moedas")
+
+# ---- EQUILÍBRIO: a FORÇA de cada lutador multiplica o dano dos golpes dele ----
+for _f in PERSONAGENS:
+    _f["forca"] = FORCA_REAL[_f["nome"]]
+_rib = next(f for f in PERSONAGENS if f["nome"] == "RIB")
+p = Partida(_rib, BONECO, Roteiro([Entrada(5, especial="E")]), Roteiro([]))
+p.fase, p.tf = "luta", 0
+p.objetos.pronto, p.objetos.recarga = False, 10 ** 9
+p.L[1].x = p.L[0].x + 400
+rodar(p, 80)
+checar(abs(dano(p) - 5 * FORCA_REAL["RIB"]) < 0.01 and FORCA_REAL["RIB"] < 1 < FORCA_REAL["TAI"],
+       f"EQUILÍBRIO: a força multiplica o dano (shuriken do Rib 5 x {FORCA_REAL['RIB']} = {dano(p):.2f})")
 
 if os.path.exists(SAVE_TESTE):
     os.remove(SAVE_TESTE)

@@ -1,12 +1,14 @@
 """TRAFO: o cachorro mutante (criado pelo Gomes).
 
-Aparência: cachorro mutante bem estranho, todo amarelo escuro, com 6 patas.
+Aparência: cachorro mutante bem estranho, todo amarelo escuro, peludo, com uma COLEIRA QUEBRADA (fugiu do
+laboratório). Remodel do Gomes (v2.x): tirou as 2 patas do meio e o Q agora é UM braço só.
   E      LINGUÃO: 10 de dano e PARALISA por 2 segundos
-  Q      enfia o braço na terra e os braços saem embaixo do oponente (tem um sinal pra pular). Joga pra cima, 20
-  R      cria +4 olhos e usa como metralhadora (6 tiros de 4)
+  Q      enfia o braço na terra e UM braço gigante sai embaixo do oponente (tem um sinal pra pular). Joga pra cima, 20
+  R      TRANSFORMAÇÃO (v2.x, do Gomes): vira o RIB um instantinho, faz o KAGE BUNSHIN e volta a ser o Trafo;
+         o clone (um Trafo) fica 5 s do outro lado do oponente e DUPLICA todo hit (1 hit vira 2)
   SHIFT  PULÃO bem longo, 10 de dano
   Z      ULTIMATE: corrida (lenta). Se acertar: cutscene arrastando o oponente, vira o Max-10 e solta um laserzão,
-         vira o oponente e usa uma skill dele. 40 de dano, mas a barra enche bem mais devagar.
+         vira o oponente e usa uma skill dele. 35 de dano (a barra enche normal desde o remodel).
 """
 import math
 import random
@@ -122,7 +124,7 @@ def terra(l, outro, jogo):
     if T_ENFIA <= t < T_TRAVA:  # o sinal aparece e vai seguindo o oponente
         m["alvo"] = outro.x
     if T_SAI + 1 <= t < T_SAI + 9 and "alvo" in m and not m.get("bateu"):
-        zona = pygame.Rect(m["alvo"] - 46 * l.s, CHAO - T_ALTURA * l.s, 92 * l.s, T_ALTURA * l.s)
+        zona = pygame.Rect(m["alvo"] - 36 * l.s, CHAO - T_ALTURA * l.s, 72 * l.s, T_ALTURA * l.s)  # (um braço só)
         c = outro.corpo()
         if c and zona.colliderect(c):  # os braços pegaram (não dá pra defender, só pular/sair)
             m["bateu"] = True
@@ -166,15 +168,21 @@ def terra_efeito(l, tela):
             alt = suave((t - T_SAI) / 5) * (T_ALTURA + 15) * l.s
         else:
             alt = max(0.0, 1 - (t - T_SOME) / (T_FIM - T_SOME)) * (T_ALTURA + 15) * l.s
-        for i, (dx, inc) in enumerate(((-28, -0.25), (0, 0.0), (28, 0.25))):
-            h = alt * (0.85 + 0.15 * (i == 1))
-            base = (x + dx * l.s, CHAO + 4)
-            topo = (base[0] + inc * h, CHAO - h)
-            pygame.draw.line(tela, (26, 18, 8), base, topo, int(17 * l.s))
-            pygame.draw.line(tela, (184, 148, 48), base, topo, int(12 * l.s))
-            pygame.draw.line(tela, (230, 196, 92), (base[0] - 3 * l.s, base[1]), (topo[0] - 3 * l.s, topo[1]), int(3 * l.s))
-            for g in (-1, 0, 1):  # garras
-                pygame.draw.line(tela, (240, 236, 220), topo, (topo[0] + g * 8 * l.s, topo[1] - 12 * l.s), max(2, int(3 * l.s)))
+        h = alt  # (UM braço só, pedido do Gomes: mais grosso, com a mão aberta e as garras)
+        base = (x, CHAO + 4)
+        topo = (x + 4 * l.s * math.sin(t * 0.5), CHAO - h)
+        pygame.draw.line(tela, (26, 18, 8), base, topo, int(26 * l.s))
+        pygame.draw.line(tela, (184, 148, 48), base, topo, int(20 * l.s))
+        pygame.draw.line(tela, (230, 196, 92), (base[0] - 5 * l.s, base[1]), (topo[0] - 5 * l.s, topo[1]), int(5 * l.s))
+        for f in range(4):  # pelinho no braço
+            fy = CHAO - h * (0.25 + f * 0.18)
+            if fy < CHAO:
+                pygame.draw.line(tela, (138, 104, 32), (topo[0] - 10 * l.s, fy), (topo[0] - 16 * l.s, fy - 6 * l.s),
+                                 max(2, int(3 * l.s)))
+        for g in (-2, -1, 0, 1, 2):  # a mão aberta: 5 garras
+            ponta = (topo[0] + g * 8 * l.s, topo[1] - (14 - abs(g) * 3) * l.s)
+            pygame.draw.line(tela, (26, 18, 8), topo, ponta, max(3, int(6 * l.s)))
+            pygame.draw.line(tela, (240, 236, 220), topo, ponta, max(2, int(3.4 * l.s)))
         pygame.draw.ellipse(tela, (60, 40, 20), (x - 60 * l.s, CHAO - 8, 120 * l.s, 16))
 
 
@@ -260,10 +268,10 @@ def pulao(l, outro, jogo):
 #   -> vira o OPONENTE e usa uma skill dele (sorteada) -> volta a ser o Trafo
 # =====================================================================
 U_SAI, U_CORRE_ATE = 14, 100
-U_DANO = 40
+U_DANO = 35
 # partes da sequência (quadros depois de acertar)
 A_ARRASTA, A_VIRA1, A_LASER, A_VIRA2, A_SKILL, A_VOLTA, A_FIM = 0, 46, 62, 108, 124, 168, 196
-DANO_ARRASTA, DANO_LASER, DANO_SKILL = 8, 16, 16
+DANO_ARRASTA, DANO_LASER, DANO_SKILL = 8, 13, 14  # (= 35)
 
 
 def _pose(ficha, nome):
@@ -400,7 +408,7 @@ def sequencia(l, outro, jogo, u):
         m["quadros"] = [(0, "parado")]
         jogo.clarao = 4
         outro.sobrepor = {}
-        outro.vida = max(0, m["vida0"] - U_DANO)  # no total, sempre 40
+        outro.vida = max(0, m["vida0"] - U_DANO)  # no total, sempre U_DANO (35)
         outro.mudar("voando")
         outro.vx, outro.vy = 5 * d, -7
         jogo.tremer(14)
@@ -451,6 +459,103 @@ def ultimate_quadros():
 # =====================================================================
 # Golpes do Trafo
 # =====================================================================
+# =====================================================================
+# R (v2.x, pedido do Gomes): TRANSFORMAÇÃO — vira o RIB, faz o selo do KAGE BUNSHIN, volta a ser o Trafo e
+# aparece um CLONE (um Trafo) do outro lado do oponente. Por 5 s, todo hit do Trafo vale 2 (o clone bate junto).
+# =====================================================================
+X_VIRA, X_SELO, X_PUF, X_FIM = 6, 10, 26, 36
+CLONE_TEMPO = 5 * 60
+CLONE_ATRASO = 5      # o clone bate um pouquinho depois do Trafo
+
+
+def transforma(l, outro, jogo):
+    from personagens import PERSONAGENS
+    t = l.t
+    l.vx = 0
+    l.fisica(jogo)
+    if t == X_VIRA:  # PUF: vira o Rib
+        som.tocar("puf")
+        fumaca(jogo, l.x, l.y - 60 * l.s, 10, (220, 226, 236), 4, -1)
+        l.disfarce = next(f for f in PERSONAGENS if f["nome"] == "RIB")
+    if X_VIRA <= t < X_PUF:
+        from rib import POSES_RIB
+        l.sobrepor = dict(POSES_RIB["r_selo"])
+    if t == X_PUF:  # KAGE BUNSHIN! volta a ser o Trafo e o clone aparece do outro lado
+        som.tocar("puf")
+        l.disfarce = l.mutado if getattr(l, "mutado", None) else None
+        l.sobrepor = None
+        fumaca(jogo, l.x, l.y - 60 * l.s, 10, (220, 226, 236), 4, -1)
+        l.extra["clone_t"] = CLONE_TEMPO
+        l.extra["tela_toda"] = True
+        x = _clone_x(l, outro)
+        fumaca(jogo, x, l.y - 60 * l.s, 12, (220, 226, 236), 4, -1)
+    if t >= X_FIM:
+        return "fim"
+
+
+def _clone_x(l, outro):
+    lado = 1 if outro.x >= l.x else -1
+    return max(PAREDE_E, min(PAREDE_D, outro.x + lado * 60 * l.s))
+
+
+def trafo_todo_quadro(l, jogo):
+    """O CLONE da Transformação: conta os 5 s e duplica os hits do Trafo. (E o relógio do olho da ADAPTAÇÃO.)"""
+    x = l.extra
+    if x.get("adapta_flash", 0) > 0:
+        x["adapta_flash"] -= 1
+    if x.get("clone_t", 0) <= 0:
+        x["tela_toda"] = False
+        return
+    x["clone_t"] -= 1
+    outro = next((o for o in getattr(jogo, "L", ()) if o is not l), None)
+    if outro is None:
+        return
+    x["clone_x"] = _clone_x(l, outro)
+    x["clone_dir"] = -1 if outro.x < x["clone_x"] else 1
+    x["clone_s"] = l.s
+    # acertou um golpe agora (não vale ultimate)? o clone repete o hit daqui a pouquinho
+    g = l.memo.get("g_hit", l.golpe) if l.estado == "ataque" and l.golpe else None
+    if l.acertou and not x.get("acertou_antes") and g and not g.get("ultimate"):
+        x.setdefault("repete", []).append((CLONE_ATRASO, g))
+    x["acertou_antes"] = l.acertou and l.estado == "ataque"
+    fila = []
+    for falta, g in x.get("repete", []):
+        if falta > 1:
+            fila.append((falta - 1, g))
+            continue
+        x["clone_bate"] = 10  # (pose de golpe no desenho)
+        if outro.vida > 0 and outro.estado != "defendendo" and not outro.extra.get("intangivel"):
+            outro.levar(g.get("dano", 0), l, g)
+            outro.tremor_hit = max(outro.tremor_hit, 6)
+            jogo.faisca(outro.x, outro.y - 64 * outro.s, False, g.get("dano", 0) >= 10)
+            som.tocar("soco" if g.get("dano", 0) < 7 else "chute", 0.8)
+    x["repete"] = fila
+    if x.get("clone_bate", 0) > 0:
+        x["clone_bate"] -= 1
+    if x["clone_t"] == 0:  # o clone some
+        som.tocar("puf", 0.6)
+        from max10 import fumaca as fum
+        fum(jogo, x["clone_x"], l.y - 60 * l.s, 10, (220, 226, 236), 4, -1)
+
+
+def desenhar_clone(l, tela, branco):
+    """O clone (um Trafo) do outro lado do oponente, virado pra ele, copiando a pose do Trafo."""
+    x = l.extra
+    if x.get("clone_t", 0) <= 0 or "clone_x" not in x or getattr(l, "_clone", False):
+        return
+    guarda = (l.x, l.dir, l.vira, l.disfarce)
+    l._clone = True
+    try:
+        l.x, l.dir, l.vira = x["clone_x"] * l.s / x["clone_s"], x["clone_dir"], False
+        p = l.pose_vista or l.pose_atual()
+        if x.get("clone_bate", 0) > 0:  # dando o golpe
+            p = POSES_TRAFO.get("t_lingua", p)
+        desenhar_trafo(l, tela, p, branco)
+    finally:
+        l.x, l.dir, l.vira, l.disfarce = guarda
+        l._clone = False
+
+
 def _registra(nome, **g):
     g.setdefault("base", "parado")
     g.setdefault("pose", "parado")
@@ -472,6 +577,10 @@ _registra("trafo_tiro_olho", ini=0, ativo=1, rec=0, dano=4, hit=10, defe=8, emp=
 _registra("trafo_olhos", ini=O_ATIRA, ativo=O_TIROS * O_INTERVALO, rec=O_FIM - O_ATIRA - O_TIROS * O_INTERVALO,
           dano=4, hit=10, defe=8, emp=2, nivel="medio", logica=metralhadora, ia="longe",
           quadros=[(0, "parado"), (O_NASCE, "t_olhos"), (O_SOME, "t_olhos"), (O_FIM, "parado")])
+_registra("trafo_transforma", ini=X_PUF, ativo=1, rec=X_FIM - X_PUF, dano=0, hit=0, defe=0, emp=0, nivel="medio",
+          logica=transforma, ia="medio",
+          quadros=[(0, "parado"), (X_VIRA - 2, "t_agacha"), (X_VIRA, "parado"), (X_FIM, "parado")])
+GOLPES["trafo_transforma"]["total"] = X_FIM + 1
 _registra("trafo_pulo", ini=P_SAI, ativo=30, rec=P_POUSO_REC, janelas=((P_SAI + 2, 120),), caixa=(-10, 20, 54, 100),
           dano=10, hit=20, defe=12, emp=6, nivel="alto", derruba=True, voo=(6, 8), logica=pulao, ia="medio",
           quadros=[(0, "t_agacha"), (P_SAI, "t_pulo"), (120, "t_pulo")])
@@ -479,7 +588,8 @@ _registra("trafo_ultimate", ini=U_SAI, ativo=U_CORRE_ATE - U_SAI, rec=30, janela
           dano=0, hit=60, defe=20, emp=0, nivel="medio", ultimate=True, logica=ultimate, efeito=ultimate_efeito,
           ia="ultimate", quadros=ultimate_quadros())
 
-GOLPES_TRAFO = {"E": "trafo_lingua", "Q": "trafo_terra", "R": "trafo_olhos", "SHIFT": "trafo_pulo", "Z": "trafo_ultimate"}
+GOLPES_TRAFO = {"E": "trafo_lingua", "Q": "trafo_terra", "R": "trafo_transforma", "SHIFT": "trafo_pulo",
+                "Z": "trafo_ultimate"}  # ("trafo_olhos", a metralhadora antiga, continua registrada)
 
 # =====================================================================
 # Desenho em pixel art
@@ -671,7 +781,77 @@ PERNINHA = Peca([
 ], PALETA, a=(1, 0), b=(1, 9))
 
 
+def _cor(letra, branco):
+    import pecas
+    if branco:
+        return (245, 245, 250) if letra != "k" else (150, 150, 160)
+    return (pecas.TROCA or {}).get(letra, PALETA[letra])
+
+
+def pelos(l, tela, p, d, esc, branco, frente):
+    """O Trafo PELUDINHO: tufos de pelo nas costas, no cangote e nas bochechas (frente=True: os da frente)."""
+    def U(u):
+        return l.ponto({"_": u}, "_")
+    k, g, dd = _cor("k", branco), _cor("g", branco), _cor("d", branco)
+    qd, pc, cb = p["qd"], p["pc"], p["cb"]
+    tufos = []
+    if not frente:  # nas costas, do quadril até o cangote (pra trás)
+        for i in range(6):
+            f = 0.08 + i * 0.17
+            x, y = qd[0] + (pc[0] - qd[0]) * f - 9, qd[1] + (pc[1] - qd[1]) * f
+            tufos.append(((x + 5, y + 4), (x - 11, y + 2 + i * 0.8), (x + 4, y - 8), dd if i % 2 else g))
+    else:  # o cangote (juba) e a bochecha
+        for i in range(4):  # a juba no cangote
+            x, y = pc[0] - 6 + i * 3, pc[1] + 3 + i * 3
+            tufos.append(((x + 4, y + 4), (x - 12, y + 4), (x + 3, y - 8), g if i % 2 else dd))
+        for j in range(2):  # topete atrás da cabeça
+            bx, by = cb[0] - 4 + j * 4, cb[1] + 6 - j
+            tufos.append(((bx, by), (bx - 7, by + 6), (bx + 3, by + 1), g if j else dd))
+        cx_, cy_ = cb[0] + 5, cb[1] - 6  # bochecha
+        tufos.append(((cx_, cy_), (cx_ - 4, cy_ - 7), (cx_ + 5, cy_ - 3), g))
+    for base, ponta, outra, cor in tufos:
+        pts = [U(base), U(ponta), U(outra)]
+        pygame.draw.polygon(tela, k, pts)
+        pygame.draw.polygon(tela, k, pts, max(2, int(1.2 * esc)))
+        mx, my = (pts[0][0] + pts[1][0] + pts[2][0]) / 3, (pts[0][1] + pts[1][1] + pts[2][1]) / 3
+        miolo = [(x * 0.72 + mx * 0.28, y * 0.72 + my * 0.28) for x, y in pts]
+        pygame.draw.polygon(tela, cor, miolo)
+
+
+def coleira(l, tela, c, cb, d, esc, branco):
+    """A COLEIRA QUEBRADA: tira de couro com rebites no pescoço e um pedaço de corrente pendurado, balançando."""
+    k = (150, 150, 160) if branco else PALETA["k"]
+    couro = (245, 245, 250) if branco else (120, 40, 34)
+    metal = (245, 245, 250) if branco else (176, 180, 190)
+    m = (c[0] + (cb[0] - c[0]) * 0.45, c[1] + (cb[1] - c[1]) * 0.45)
+    ux, uy = cb[0] - c[0], cb[1] - c[1]
+    n = math.hypot(ux, uy) or 1
+    px, py = -uy / n, ux / n  # atravessado no pescoço
+    meia = 6.5 * esc
+    a = (m[0] - px * meia, m[1] - py * meia)
+    b = (m[0] + px * meia, m[1] + py * meia)
+    pygame.draw.line(tela, k, a, b, max(4, int(5 * esc)))
+    pygame.draw.line(tela, couro, a, b, max(2, int(3 * esc)))
+    for f in (0.25, 0.75):  # rebites
+        r = (a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f)
+        pygame.draw.circle(tela, metal, (round(r[0]), round(r[1])), max(1, int(1 * esc)))
+    # a argola e a corrente quebrada pendurada (balança com o movimento)
+    arg = (m[0] + px * 2 * esc * d, m[1] + 3 * esc)
+    pygame.draw.circle(tela, k, (round(arg[0]), round(arg[1])), max(2, int(2.4 * esc)))
+    pygame.draw.circle(tela, metal, (round(arg[0]), round(arg[1])), max(2, int(2.4 * esc)), max(1, int(esc)))
+    bal = math.sin(l.t * 0.15) * 0.35 - l.vx * 0.04
+    pos = arg
+    for i in range(4):
+        prox = (pos[0] + math.sin(bal + i * 0.15) * 3.2 * esc, pos[1] + math.cos(bal) * 3.2 * esc)
+        pygame.draw.line(tela, k, pos, prox, max(3, int(2.6 * esc)))
+        pygame.draw.line(tela, metal if i % 2 == 0 else (120, 124, 136), pos, prox, max(1, int(1.4 * esc)))
+        pos = prox
+    # a ponta quebrada (elo aberto)
+    pygame.draw.line(tela, metal, pos, (pos[0] + 1.5 * esc, pos[1] + 1.5 * esc), max(1, int(esc)))
+
+
 def desenhar_trafo(l, tela, p, branco):
+    desenhar_clone(l, tela, branco)  # TRANSFORMAÇÃO (R): o clone do outro lado do oponente
     esc = l.s / S_REF
     d = l.lado()
     espelho = d < 0
@@ -711,16 +891,23 @@ def desenhar_trafo(l, tela, p, branco):
     longe, perto = (("cf", "mf", "pf", "jf"), ("ct", "mt", "pt", "jt")) if costas else \
         (("ct", "mt", "pt", "jt"), ("cf", "mf", "pf", "jf"))
     braco(longe[0], longe[1], longe_v)
-    pata_do_meio(longe[1], longe[2], longe_v, -1)
     perna(longe[2], longe[3], longe_v)
+    pelos(l, tela, p, d, esc, branco, frente=False)
     c, cb = P("pc"), P("cb")
     (TRONCO_COSTAS if costas else TRONCO).desenhar(tela, P("qd"), c, esc, espelho, perto_v)
     perna(perto[2], perto[3], perto_v)
-    pata_do_meio(perto[1], perto[2], perto_v, 1)
     u, _ = cabeca_eixos(c, cb, d)
     pygame.draw.line(tela, PALETA["k"], c, mais(cb, u, -3 * esc), max(3, int(6 * esc)))
     pygame.draw.line(tela, PALETA["g"] if not branco else (240, 240, 240), c, mais(cb, u, -3 * esc), max(1, int(4 * esc)))
-    (CABECA_COSTAS if costas else CABECA).desenhar(tela, cb, mais(cb, u, 10), esc, espelho, perto_v)
+    na_cabeca = (CABECA_COSTAS if costas else CABECA).desenhar(tela, cb, mais(cb, u, 10), esc, espelho, perto_v)
+    pelos(l, tela, p, d, esc, branco, frente=True)
+    fl = l.extra.get("adapta_flash", 0)
+    if fl > 0 and not costas and not branco and (fl // 4) % 2 == 0:  # ADAPTAÇÃO: o olho pisca vermelho
+        nivel = l.extra.get("adapta_nivel", 1)
+        olho = na_cabeca(6.0, 5.0)
+        brilho(tela, (int(olho[0]), int(olho[1])), int((3 + nivel * 1.6) * esc), (255, 40, 30), 70 + 45 * nivel)
+        pygame.draw.circle(tela, (255, 60 - nivel * 12, 40 - nivel * 8), (int(olho[0]), int(olho[1])), max(1, int(1.2 * esc)))
+    coleira(l, tela, c, cb, d, esc, branco)
     braco(perto[0], perto[1], perto_v)
     # os 4 olhos a mais (R)
     olhos = l.memo.get("olhos", 0) if l.estado == "ataque" else 0
@@ -747,10 +934,7 @@ def figura_extra(q, P, s, d, cor, escura, cont, branco, t):
     pygame.draw.polygon(q, cont, orelha, 3)
     pygame.draw.circle(q, (238, 234, 214), (int(cb[0] + 4 * s * d), int(cb[1] - 2 * s)), max(2, int(2.6 * s)))
     pygame.draw.circle(q, (196, 36, 28), (int(cb[0] + 5 * s * d), int(cb[1] - 2 * s)), max(1, int(1.6 * s)))
-    meio = ((qd[0] + pc[0]) / 2, (qd[1] + pc[1]) / 2)
-    for lado in (-1, 1):
-        pe = (meio[0] + lado * 14 * s, meio[1] + 30 * s)
-        membro(q, [(meio, 3 * s), (pe, 2.4 * s)], escura if lado < 0 else cor, cont, borda=2, brilho=0.3, sombra=0.3)
+    # (as patas do meio saíram no remodel do Gomes)
 
 
 # =====================================================================

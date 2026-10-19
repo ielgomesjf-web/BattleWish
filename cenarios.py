@@ -773,6 +773,349 @@ class VilaSapos(Base):
                 pygame.draw.line(tela, (220, 240, 255), (x / px, (y - 4) / px), (x / px, (y + 4) / px), 1)
 
 
+# =====================================================================
+# TEATRO DE MÁGICA (John): palco, cortina vermelha, holofotes, caixas de mágica e a plateia no escuro
+# =====================================================================
+class Teatro(Base):
+    nome = "TEATRO DE MÁGICA"
+
+    def _fundo(self):
+        sup = pygame.Surface((LARGURA, ALTURA))
+        _degrade(sup, (0, 0, LARGURA, CHAO), (22, 12, 34), (48, 26, 62))  # a parede do fundo do palco
+        rng = random.Random(77)
+        for _ in range(40):  # estrelinhas pintadas no pano de fundo
+            x, y = rng.uniform(140, LARGURA - 140), rng.uniform(70, CHAO - 150)
+            pygame.draw.circle(sup, (120, 90, 160), (int(x), int(y)), rng.choice((1, 1, 2)))
+        pygame.draw.circle(sup, (220, 210, 150), (LARGURA // 2, 150), 44)  # a lua de papelão
+        pygame.draw.circle(sup, (48, 26, 62), (LARGURA // 2 + 18, 140), 40)
+        # a caixa de mágica (estrelas) e a caixa de serrar, no fundo do palco
+        caixa = pygame.Rect(190, CHAO - 170, 70, 170)
+        pygame.draw.rect(sup, (16, 8, 24), caixa.inflate(6, 6), border_radius=6)
+        pygame.draw.rect(sup, (90, 40, 140), caixa, border_radius=6)
+        for k in range(5):
+            cx, cy = caixa.x + 18 + (k % 2) * 34, caixa.y + 22 + k * 30
+            pygame.draw.polygon(sup, (240, 200, 70), [(cx + 7 * math.cos(a * math.pi / 5 - math.pi / 2) * (1 if a % 2 == 0 else 0.45),
+                                                       cy + 7 * math.sin(a * math.pi / 5 - math.pi / 2) * (1 if a % 2 == 0 else 0.45))
+                                                      for a in range(10)])
+        serra = pygame.Rect(LARGURA - 330, CHAO - 70, 150, 50)
+        pygame.draw.rect(sup, (16, 8, 24), serra.inflate(6, 6), border_radius=4)
+        pygame.draw.rect(sup, (170, 40, 50), serra, border_radius=4)
+        pygame.draw.line(sup, (230, 230, 236), (serra.centerx, serra.y - 30), (serra.centerx, serra.bottom + 4), 4)
+        for x in (serra.x + 8, serra.right - 18):
+            pygame.draw.rect(sup, (16, 8, 24), (x, serra.bottom, 10, 20))
+        # as cortinas vermelhas nos lados (com dobras) e a bambinela em cima
+        for lado in (0, 1):
+            for k in range(7):
+                x = (k * 20) if lado == 0 else LARGURA - 140 + k * 20
+                cor = (150, 20, 30) if k % 2 else (190, 34, 44)
+                pygame.draw.rect(sup, cor, (x, 0, 20, CHAO + 4))
+            borda = 140 if lado == 0 else LARGURA - 140
+            pygame.draw.line(sup, (90, 10, 18), (borda, 0), (borda, CHAO), 4)
+            pygame.draw.circle(sup, (230, 190, 70), (borda + (-8 if lado == 0 else 8), CHAO - 230), 9)  # a corda dourada
+        pygame.draw.rect(sup, (170, 26, 38), (0, 0, LARGURA, 56))
+        for x in range(0, LARGURA, 40):  # a bambinela ondulada com franja dourada
+            pygame.draw.ellipse(sup, (170, 26, 38), (x - 4, 36, 48, 40))
+            pygame.draw.arc(sup, (230, 190, 70), (x - 4, 36, 48, 40), math.pi, 2 * math.pi, 3)
+        # o palco (tábuas de madeira) e a beirada
+        _degrade(sup, (0, CHAO, LARGURA, 26), (120, 70, 40), (84, 46, 24))
+        for x in range(0, LARGURA, 60):
+            pygame.draw.line(sup, (70, 38, 20), (x, CHAO), (x - 20, CHAO + 26), 2)
+        pygame.draw.rect(sup, (40, 20, 12), (0, CHAO + 26, LARGURA, 6))
+        for x in range(30, LARGURA, 90):  # luzinhas da ribalta
+            pygame.draw.circle(sup, (255, 230, 150), (x, CHAO + 29), 3)
+        # a plateia no escuro (cabeças), lá embaixo
+        sup.fill((10, 6, 14), (0, CHAO + 32, LARGURA, ALTURA - CHAO - 32))
+        self.cabecas = [(x + rng.uniform(-10, 10), CHAO + 50 + rng.uniform(0, 14), rng.uniform(0, 6))
+                        for x in range(10, LARGURA, 34)]
+        return sup
+
+    def __init__(self):
+        super().__init__()
+        self.holofotes = [(260, 0.7, 0.0), (LARGURA - 260, 0.5, 2.0)]
+
+    def animar(self, tela, t, px):
+        luz = pygame.Surface(tela.get_size(), pygame.SRCALPHA)
+        for x0, vel, fase in self.holofotes:  # os holofotes passeando pelo palco
+            alvo = LARGURA / 2 + math.sin(t * 0.01 * vel + fase) * 300
+            pygame.draw.polygon(luz, (255, 240, 200, 26), [(x0 / px - 6, 0), (x0 / px + 6, 0),
+                                                           ((alvo + 90) / px, CHAO / px), ((alvo - 90) / px, CHAO / px)])
+            pygame.draw.ellipse(luz, (255, 240, 200, 40), ((alvo - 90) / px, (CHAO - 10) / px, 180 / px, 20 / px))
+        tela.blit(luz, (0, 0))
+        for x, y, f in self.cabecas:  # a plateia mexendo a cabeça
+            yy = y + math.sin(t * 0.05 + f) * 2
+            pygame.draw.circle(tela, (28, 20, 36), (int(x / px), int(yy / px)), max(2, int(12 / px)))
+
+
+# =====================================================================
+# NAVIO FANTASMA (Cráquen): noite, lua verde, mar, névoa, convés de madeira e velas rasgadas
+# =====================================================================
+class NavioFantasma(Base):
+    nome = "NAVIO FANTASMA"
+
+    def _fundo(self):
+        sup = pygame.Surface((LARGURA, ALTURA))
+        _degrade(sup, (0, 0, LARGURA, 330), (8, 20, 26), (30, 64, 70))
+        _brilho(sup, (720, 110), 110, (150, 255, 170), 90)
+        pygame.draw.circle(sup, (190, 250, 190), (720, 110), 48)  # a lua verde
+        pygame.draw.circle(sup, (160, 220, 160), (704, 98), 9)
+        pygame.draw.circle(sup, (160, 220, 160), (736, 124), 6)
+        rng = random.Random(13)
+        for _ in range(50):
+            pygame.draw.circle(sup, (140, 200, 190), (int(rng.uniform(0, LARGURA)), int(rng.uniform(0, 250))), 1)
+        _degrade(sup, (0, 300, LARGURA, 60), (20, 50, 60), (12, 34, 44))  # o mar lá no fundo
+        # o mastro e as velas rasgadas
+        pygame.draw.rect(sup, (50, 36, 26), (LARGURA // 2 - 10, 20, 20, CHAO - 20))
+        pygame.draw.rect(sup, (70, 50, 34), (LARGURA // 2 - 6, 20, 6, CHAO - 20))
+        pygame.draw.rect(sup, (50, 36, 26), (LARGURA // 2 - 170, 70, 340, 10))
+        for y0, larg, alt in ((80, 300, 120), (230, 240, 90)):
+            vela = [(LARGURA // 2 - larg // 2, y0), (LARGURA // 2 + larg // 2, y0),
+                    (LARGURA // 2 + larg // 2 - 14, y0 + alt), (LARGURA // 2 + 40, y0 + alt - 20),
+                    (LARGURA // 2 + 10, y0 + alt + 6), (LARGURA // 2 - 50, y0 + alt - 26),
+                    (LARGURA // 2 - larg // 2 + 10, y0 + alt)]
+            pygame.draw.polygon(sup, (170, 180, 160), vela)
+            pygame.draw.polygon(sup, (110, 120, 104), vela, 3)
+            pygame.draw.circle(sup, (40, 50, 50), (LARGURA // 2, y0 + alt // 2), 18)  # a caveira da vela
+            pygame.draw.circle(sup, (170, 180, 160), (LARGURA // 2 - 6, y0 + alt // 2 - 3), 4)
+            pygame.draw.circle(sup, (170, 180, 160), (LARGURA // 2 + 6, y0 + alt // 2 - 3), 4)
+        for x0 in (60, LARGURA - 60):  # as cordas
+            pygame.draw.line(sup, (90, 76, 54), (x0, CHAO - 40), (LARGURA // 2, 30), 2)
+        # a amurada (corrimão) no fundo e o convés
+        pygame.draw.rect(sup, (60, 42, 28), (0, CHAO - 70, LARGURA, 12))
+        for x in range(10, LARGURA, 50):
+            pygame.draw.rect(sup, (54, 38, 26), (x, CHAO - 60, 10, 60))
+        _degrade(sup, (0, CHAO, LARGURA, ALTURA - CHAO), (96, 66, 42), (54, 36, 22))
+        for x in range(0, LARGURA, 70):
+            pygame.draw.line(sup, (60, 40, 24), (x, CHAO), (x - 10, ALTURA), 2)
+        pygame.draw.line(sup, (40, 26, 16), (0, CHAO), (LARGURA, CHAO), 3)
+        return sup
+
+    def __init__(self):
+        super().__init__()
+        rng = random.Random(21)
+        self.nevoa = [[rng.uniform(0, LARGURA), rng.uniform(CHAO - 140, CHAO + 20), rng.uniform(0.3, 0.9),
+                       rng.uniform(60, 140)] for _ in range(9)]
+        self.lanternas = (120, LARGURA - 120)
+
+    def animar(self, tela, t, px):
+        for x in self.lanternas:  # as lanternas com fogo verde
+            y = CHAO - 110
+            pygame.draw.line(tela, (40, 30, 20), (x / px, (y - 30) / px), (x / px, y / px), 1)
+            r = (9 + math.sin(t * 0.3 + x) * 2) / px
+            pygame.draw.circle(tela, (120, 255, 150), (int(x / px), int((y + 10) / px)), max(1, int(r)))
+            pygame.draw.rect(tela, (30, 24, 18), ((x - 8) / px, (y + 2) / px, 16 / px, 18 / px), 1)
+        for i in range(4):  # as ondinhas do mar
+            x = ((t * 0.5 + i * 260) % (LARGURA + 100)) - 50
+            pygame.draw.line(tela, (60, 110, 120), (x / px, (315 + i * 9) / px), ((x + 40) / px, (315 + i * 9) / px), 1)
+        camada = pygame.Surface(tela.get_size(), pygame.SRCALPHA)
+        for n in self.nevoa:  # a névoa passando
+            n[0] = (n[0] + n[2]) % (LARGURA + 300)
+            pygame.draw.ellipse(camada, (170, 230, 220, 34), ((n[0] - 150) / px, n[1] / px, n[3] * 2 / px, n[3] * 0.5 / px))
+        tela.blit(camada, (0, 0))
+
+
+# =====================================================================
+# CERCADO DO DESERTO (Magnus): o cercado da base militar onde ele morava (tipo os do Jurassic Park),
+# com deserto, um OÁSIS lá atrás (o coqueiro do oásis é um objeto, em x=790) e a cerca elétrica arrebentada
+# =====================================================================
+class CercadoDeserto(Base):
+    nome = "CERCADO DO DESERTO"
+    OASIS = 790
+
+    def _fundo(self):
+        sup = pygame.Surface((LARGURA, ALTURA))
+        _degrade(sup, (0, 0, LARGURA, 300), (90, 160, 220), (250, 210, 150))  # céu quente
+        _brilho(sup, (180, 90), 100, (255, 240, 180), 120)
+        pygame.draw.circle(sup, (255, 246, 210), (180, 90), 40)  # o sol
+        # as dunas lá longe
+        for cor, alt, fase in (((222, 176, 120), 250, 0.0), ((210, 160, 100), 280, 1.7)):
+            pts = [(x, alt + math.sin(x * 0.006 + fase) * 22) for x in range(0, LARGURA + 20, 20)]
+            pygame.draw.polygon(sup, cor, [(0, CHAO)] + pts + [(LARGURA, CHAO)])
+        # a base militar lá no fundo (torre de vigia, galpão, antena)
+        pygame.draw.rect(sup, (150, 140, 120), (40, 214, 150, 60))
+        pygame.draw.polygon(sup, (120, 112, 96), [(36, 216), (115, 196), (194, 216)])
+        pygame.draw.rect(sup, (96, 90, 78), (98, 240, 30, 34))
+        for x0 in (232, 262):
+            pygame.draw.line(sup, (90, 84, 74), (x0, 270), (247, 168), 3)
+        pygame.draw.rect(sup, (110, 102, 90), (230, 150, 36, 22))
+        pygame.draw.line(sup, (80, 76, 70), (70, 214), (70, 170), 2)
+        # o OÁSIS (a água e o mato em volta; o coqueiro é um objeto por cima)
+        o = self.OASIS
+        pygame.draw.ellipse(sup, (120, 150, 80), (o - 150, CHAO - 66, 300, 44))
+        pygame.draw.ellipse(sup, (60, 140, 170), (o - 120, CHAO - 58, 240, 30))
+        pygame.draw.ellipse(sup, (120, 200, 220), (o - 80, CHAO - 52, 120, 10))
+        for k in range(9):  # o capim do oásis
+            x = o - 140 + k * 35
+            pygame.draw.line(sup, (70, 120, 50), (x, CHAO - 40), (x - 6, CHAO - 66), 3)
+            pygame.draw.line(sup, (90, 140, 60), (x + 4, CHAO - 40), (x + 10, CHAO - 62), 3)
+        # a CERCA ELÉTRICA alta (com um buraco arrebentado: foi por onde ele fugiu)
+        buraco = (430, 560)
+        for x in range(30, LARGURA, 150):
+            if buraco[0] - 10 < x < buraco[1]:  # (o poste do buraco foi arrancado)
+                continue
+            pygame.draw.rect(sup, (70, 72, 78), (x, CHAO - 210, 14, 210))
+            pygame.draw.rect(sup, (110, 112, 120), (x + 2, CHAO - 210, 4, 210))
+            pygame.draw.rect(sup, (230, 190, 40), (x - 2, CHAO - 216, 18, 8))
+        for i in range(7):
+            y = CHAO - 200 + i * 26
+            for a, b in ((0, buraco[0]), (buraco[1], LARGURA)):
+                pygame.draw.line(sup, (54, 56, 60), (a, y), (b, y), 2)
+            pygame.draw.line(sup, (54, 56, 60), (buraco[0], y), (buraco[0] + 20 + i * 4, y + 30), 2)  # fios soltos
+            pygame.draw.line(sup, (54, 56, 60), (buraco[1], y), (buraco[1] - 16 - i * 3, y + 34), 2)
+        # a placa de aviso
+        pygame.draw.rect(sup, (230, 190, 40), (300, CHAO - 150, 96, 56))
+        pygame.draw.rect(sup, (40, 30, 20), (300, CHAO - 150, 96, 56), 3)
+        from efeitos import texto
+        texto(sup, "PERIGO", 16, (160, 20, 20), (348, CHAO - 136))
+        texto(sup, "EXPERIMENTO 13", 11, (40, 30, 20), (348, CHAO - 112))
+        # o chão de areia com pegadas de raptor
+        _degrade(sup, (0, CHAO, LARGURA, ALTURA - CHAO), (226, 184, 124), (184, 140, 86))
+        pygame.draw.line(sup, (160, 120, 70), (0, CHAO), (LARGURA, CHAO), 3)
+        for k in range(6):
+            x, y = 470 + k * 60, CHAO + 18 + (k % 2) * 16
+            for a in (-0.5, 0, 0.5):
+                pygame.draw.line(sup, (170, 128, 78), (x, y), (x + 12 * math.cos(a), y + 12 * math.sin(a)), 3)
+        return sup
+
+    def animar(self, tela, t, px):
+        if (t // 6) % 2:  # a luz vermelha da torre piscando
+            pygame.draw.circle(tela, (255, 50, 40), (int(248 / px), int(146 / px)), max(1, int(4 / px)))
+        if t % 90 < 8:  # faísca nos fios arrebentados da cerca
+            x, y = 430 + 30, CHAO - 150
+            for k in range(4):
+                a = t * 1.7 + k * 1.6
+                pygame.draw.line(tela, (180, 230, 255), (x / px, y / px),
+                                 ((x + math.cos(a) * 14) / px, (y + math.sin(a) * 14) / px), 1)
+        for k in range(3):  # o brilho da água do oásis
+            x = self.OASIS - 60 + ((t * 0.4 + k * 50) % 120)
+            pygame.draw.line(tela, (220, 250, 255), (x / px, (CHAO - 46 + k * 4) / px), ((x + 10) / px, (CHAO - 46 + k * 4) / px), 1)
+
+
+# =====================================================================
+# PRAIA DA ILHA (Sphyrus): a praia com o laboratório de onde ele fugiu lá no fundo; o mar fica à DIREITA
+# (as ondas gigantes do clima vêm de lá) e o espaço em x=180 é da boia salva-vidas (objeto)
+# =====================================================================
+class PraiaIlha(Base):
+    nome = "PRAIA DA ILHA"
+
+    def _fundo(self):
+        sup = pygame.Surface((LARGURA, ALTURA))
+        _degrade(sup, (0, 0, LARGURA, 300), (80, 170, 230), (200, 236, 250))  # céu
+        _brilho(sup, (760, 80), 90, (255, 250, 210), 120)
+        pygame.draw.circle(sup, (255, 252, 230), (760, 80), 34)  # o sol
+        for cx, cy, w in ((160, 70, 120), (420, 50, 160), (620, 110, 100)):  # nuvens
+            for k in range(3):
+                pygame.draw.ellipse(sup, (250, 252, 255), (cx + k * w // 4, cy - (k % 2) * 10, w // 2, 30))
+        # a ILHA lá no fundo com o LABORATÓRIO no morro
+        pygame.draw.polygon(sup, (70, 120, 70), [(120, 300), (230, 190), (330, 170), (450, 200), (560, 300)])
+        pygame.draw.polygon(sup, (90, 140, 80), [(170, 300), (260, 210), (340, 196), (420, 220), (500, 300)])
+        pygame.draw.rect(sup, (200, 204, 208), (276, 150, 110, 52))  # o prédio
+        pygame.draw.rect(sup, (150, 156, 164), (276, 150, 110, 52), 3)
+        pygame.draw.rect(sup, (170, 176, 184), (300, 128, 40, 24))
+        for i in range(4):  # janelas
+            pygame.draw.rect(sup, (60, 90, 120), (286 + i * 25, 162, 14, 10))
+        pygame.draw.rect(sup, (40, 40, 48), (340, 178, 22, 24))  # o portão arrombado
+        pygame.draw.line(sup, (150, 156, 164), (340, 178), (330, 202), 3)
+        pygame.draw.line(sup, (120, 120, 130), (366, 128), (366, 92), 2)  # antena
+        pygame.draw.circle(sup, (220, 60, 60), (366, 92), 3)
+        for x0 in (400, 430, 460):  # o tanque de água (de onde ele saiu)
+            pygame.draw.line(sup, (120, 130, 140), (x0, 202), (x0 + 6, 188), 2)
+        pygame.draw.ellipse(sup, (140, 200, 220), (396, 176, 76, 16))
+        # o MAR (à direita) e a areia
+        _degrade(sup, (0, 300, LARGURA, 70), (40, 140, 200), (60, 170, 210))
+        pygame.draw.polygon(sup, (226, 206, 150), [(0, 330), (420, 330), (600, 370), (620, CHAO), (0, CHAO)])
+        pygame.draw.polygon(sup, (70, 180, 210), [(600, 370), (LARGURA, 340), (LARGURA, CHAO), (640, CHAO)])
+        for k in range(5):  # a espuma na beira
+            y = 380 + k * 22
+            pygame.draw.line(sup, (240, 250, 255), (612 + k * 4, y), (680 + k * 6, y - 4), 3)
+        _degrade(sup, (0, CHAO, LARGURA, ALTURA - CHAO), (232, 212, 156), (196, 172, 116))
+        pygame.draw.line(sup, (170, 146, 96), (0, CHAO), (LARGURA, CHAO), 3)
+        rng = random.Random(14)
+        for _ in range(30):  # conchinhas e pedrinhas
+            x, y = rng.uniform(0, LARGURA), rng.uniform(CHAO + 8, ALTURA - 6)
+            pygame.draw.circle(sup, rng.choice(((250, 230, 220), (180, 160, 120), (240, 200, 190))), (int(x), int(y)), 2)
+        # uma placa caída do laboratório na areia
+        pygame.draw.polygon(sup, (200, 200, 200), [(470, CHAO - 6), (540, CHAO - 14), (544, CHAO - 2), (474, CHAO + 4)])
+        return sup
+
+    def __init__(self):
+        super().__init__()
+        rng = random.Random(15)
+        self.gaivotas = [[rng.uniform(0, LARGURA), rng.uniform(60, 160), rng.uniform(0.5, 1.1)] for _ in range(3)]
+
+    def animar(self, tela, t, px):
+        for i in range(4):  # as ondinhas do mar
+            x = 640 + ((t * 0.7 + i * 80) % 300)
+            y = 360 + i * 24
+            pygame.draw.line(tela, (230, 248, 255), (x / px, y / px), ((x + 30) / px, (y - 2) / px), 1)
+        for g in self.gaivotas:  # gaivotas
+            g[0] = (g[0] + g[2]) % (LARGURA + 40)
+            asa = math.sin(t * 0.25 + g[1]) * 4
+            x, y = g[0] / px, g[1] / px
+            pygame.draw.lines(tela, (60, 60, 70), False, [(x - 6 / px, y - asa / px), (x, y), (x + 6 / px, y - asa / px)], 1)
+        if (t // 20) % 2:  # a luz da antena do laboratório
+            pygame.draw.circle(tela, (255, 80, 80), (int(366 / px), int(92 / px)), max(1, int(3 / px)))
+
+
+# =====================================================================
+# MONTANHA NEVADA (Frigantus): uma montanha MUITO alta, toda nevada, com pinheiros e neve caindo
+# (o espaço em x=790 é da placa PERIGO: AVALANCHE, que é um objeto)
+# =====================================================================
+class MontanhaNevada(Base):
+    nome = "MONTANHA NEVADA"
+
+    def _fundo(self):
+        sup = pygame.Surface((LARGURA, ALTURA))
+        _degrade(sup, (0, 0, LARGURA, 320), (120, 170, 220), (220, 236, 250))  # céu frio
+        # o PICO enorme lá atrás (passa do alto da tela)
+        pico = [(80, 330), (330, 70), (430, -40), (520, 40), (640, 120), (900, 330)]
+        pygame.draw.polygon(sup, (150, 166, 190), pico)
+        neve = [(250, 160), (330, 70), (430, -40), (520, 40), (590, 92), (540, 120), (480, 96), (420, 130),
+                (370, 110), (310, 150)]
+        pygame.draw.polygon(sup, (246, 250, 255), neve)
+        pygame.draw.line(sup, (200, 214, 232), (430, -40), (420, 130), 3)
+        # as montanhas do meio
+        for cor, pts in (((170, 186, 208), [(-40, 330), (140, 190), (300, 330)]),
+                         ((176, 192, 214), [(620, 330), (820, 170), (1000, 330)])):
+            pygame.draw.polygon(sup, cor, pts)
+            topo = pts[1]
+            pygame.draw.polygon(sup, (246, 250, 255), [(topo[0] - 50, topo[1] + 56), topo, (topo[0] + 50, topo[1] + 56),
+                                                       (topo[0] + 10, topo[1] + 44), (topo[0] - 16, topo[1] + 52)])
+        # a encosta de neve e os pinheiros
+        _degrade(sup, (0, 300, LARGURA, CHAO - 300), (226, 236, 248), (200, 214, 234))
+        rnd = random.Random(31)
+        for i in range(16):
+            x = rnd.uniform(0, LARGURA)
+            if 700 < x < 880:
+                continue  # (lugar da placa)
+            base = rnd.uniform(330, CHAO - 50)
+            h = rnd.uniform(40, 90) * (0.6 + (base - 300) / 300)
+            for k in range(3):  # o pinheiro em camadas, com neve em cima
+                y = base - k * h * 0.28
+                w = h * (0.42 - k * 0.1)
+                pygame.draw.polygon(sup, (34, 70, 56), [(x - w, y), (x, y - h * 0.5), (x + w, y)])
+                pygame.draw.polygon(sup, (240, 246, 252), [(x - w * 0.4, y - h * 0.32), (x, y - h * 0.5), (x + w * 0.4, y - h * 0.32)])
+            pygame.draw.rect(sup, (70, 50, 34), (x - 3, base, 6, 10))
+        # o chão de neve
+        _degrade(sup, (0, CHAO, LARGURA, ALTURA - CHAO), (244, 248, 255), (206, 218, 236))
+        pygame.draw.line(sup, (180, 196, 220), (0, CHAO), (LARGURA, CHAO), 3)
+        for i in range(12):  # montinhos e pegadas
+            x = rnd.uniform(0, LARGURA)
+            pygame.draw.ellipse(sup, (224, 232, 246), (x, CHAO + rnd.uniform(6, 40), 60, 12))
+        return sup
+
+    def __init__(self):
+        super().__init__()
+        rnd = random.Random(32)
+        self.flocos = [[rnd.uniform(0, LARGURA), rnd.uniform(0, ALTURA), rnd.uniform(0.6, 1.6), rnd.uniform(0, 6)]
+                       for _ in range(70)]
+
+    def animar(self, tela, t, px):
+        for f in self.flocos:  # a neve caindo
+            f[1] = (f[1] + f[2]) % ALTURA
+            x = (f[0] + math.sin(t * 0.03 + f[3]) * 12) % LARGURA
+            pygame.draw.circle(tela, (255, 255, 255), (int(x / px), int(f[1] / px)), max(1, int(2 / px)))
+
+
 SECRETOS = {"VILA DOS SAPOS": "ULTRA-MEGA-VILLAGE"}  # cenário: código que libera
 
 
@@ -785,7 +1128,9 @@ def disponiveis():
 Templo.nome = "TEMPLO"
 CENARIOS = {"TEMPLO": Templo, "PÂNTANO": Pantano, "FERRO-VELHO": FerroVelho, "TOCA": Toca, "DOJO": Dojo,
             "CAMPO DE BATALHA": CampoBatalha, "TORRE DO MAGO": TorreMago, "CASSINO": Cassino, "LABORATÓRIO": Laboratorio, "ARENA DE SUMÔ": ArenaSumo, "SELVA": Selva,
-            "VILA DOS SAPOS": VilaSapos}
+            "VILA DOS SAPOS": VilaSapos, "TEATRO DE MÁGICA": Teatro,
+            "NAVIO FANTASMA": NavioFantasma, "CERCADO DO DESERTO": CercadoDeserto,
+            "PRAIA DA ILHA": PraiaIlha, "MONTANHA NEVADA": MontanhaNevada}
 _prontos = {}
 
 

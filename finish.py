@@ -1,0 +1,532 @@
+"""FINISH (v2.0, ideia aprovada pelo Gomes): a luta acabou com uma ULTIMATE? Aparece "FINISH!", a câmera chega
+perto e o vencedor faz uma cena curtinha e engraçada própria dele (sem sangue, só zoeira). Depois, a vitória.
+
+Cada lutador tem: passo(v, d, t, jogo)  -> mexe no vencedor (v) e no derrotado (d); t = quadro do FINISH
+                  desenhar(v, d, tela, t) -> os efeitos (o t continua depois que acaba: o "resultado" fica na tela)
+                  some = o derrotado some (vira outra coisa) a partir do quadro tal
+Tudo só mexe em posição/pose/desenho, depois que a luta já acabou (no ONLINE sai igual nos dois PCs)."""
+import math
+
+import pygame
+
+import som
+from config import *  # noqa: F401,F403
+from golpes import misturar, suave
+
+DURACAO = 170
+TEXTO = 34  # quadros do "FINISH!" grandão no começo
+
+
+def ponto_do_caido(d, k):
+    """Onde está um pedaço (k = 'pc' peito, 'cb' cabeça...) do derrotado deitado."""
+    return d.ponto(d.poses["caido"], k)
+
+
+def pose(l, nome, alvo=None, k=1.0):
+    """Põe o lutador numa pose dele (ou mistura com outra)."""
+    p = l.poses.get(nome) or l.poses["vitoria"]
+    if alvo:
+        p = misturar(p, l.poses.get(alvo) or l.poses["parado"], k)
+    l.sobrepor = dict(p)
+
+
+def contorno(tela, cor, pts, w=2):
+    pygame.draw.polygon(tela, (12, 10, 18), pts)
+    meio = (sum(x for x, _ in pts) / len(pts), sum(y for _, y in pts) / len(pts))
+    pygame.draw.polygon(tela, cor, [(x + (meio[0] - x) * 0.12, y + (meio[1] - y) * 0.12) for x, y in pts])
+
+
+def poeira(jogo, x, n=10):
+    from max10 import fumaca
+    fumaca(jogo, x, CHAO - 4, n, (180, 170, 150), 4, -0.6)
+
+
+def puf(jogo, x, y, n=12, cor=(220, 220, 236)):
+    from max10 import fumaca
+    fumaca(jogo, x, y, n, cor, 5, -1)
+
+
+# =====================================================================
+# MAX-10: RECICLAGEM (escaneia, vira cubo de ferro-velho, chuta pra longe)
+# =====================================================================
+def max_passo(v, d, t, jogo):
+    pose(v, "especial" if t < 60 else "chute" if 100 <= t < 116 else "parado")
+    if t == 10:
+        som.tocar("laser", 0.6)
+    if t == 60:  # virou cubo de ferro-velho
+        d.esconde = True
+        puf(jogo, d.x, CHAO - 20, 14, (170, 170, 180))
+        som.tocar("quebra", 0.7)
+    if t == 104:
+        som.tocar("chute")
+
+
+def max_desenhar(v, d, tela, t):
+    s = d.s
+    if t < 60:  # o scanner vermelho passando
+        y = CHAO - 10 - (t * 3 % 120) * s
+        pygame.draw.line(tela, (255, 40, 40), (d.x - 50 * s, y), (d.x + 50 * s, y), 2)
+        pygame.draw.line(tela, (255, 160, 150), (v.x + v.dir * 30 * v.s, v.y - 100 * v.s), (d.x, y), 1)
+        return
+    lado = max(10, 34 * s * (1 - min(1, (t - 60) / 30)) + 14 * s)
+    x, y = d.x, CHAO - lado / 2
+    if t >= 104:  # chutado pra longe (com arco)
+        k = (t - 104) / 40
+        x += v.dir * 700 * k
+        y -= math.sin(min(1, k) * math.pi) * 160
+    r = pygame.Rect(0, 0, lado, lado)
+    r.center = (int(x), int(y))
+    pygame.draw.rect(tela, (12, 10, 18), r.inflate(4, 4))
+    pygame.draw.rect(tela, (120, 122, 132), r)
+    pygame.draw.line(tela, (80, 82, 92), r.topleft, r.bottomright, 2)
+    pygame.draw.line(tela, (160, 162, 172), (r.x, r.centery), (r.right, r.centery), 2)
+
+
+# =====================================================================
+# RIB: CHUVA DE SHURIKEN (prende no chão) + selo de mão
+# =====================================================================
+def rib_passo(v, d, t, jogo):
+    pose(v, "r_selo")
+    if 20 <= t < 70 and t % 10 == 0:
+        som.tocar("shuriken", 0.5)
+
+
+def rib_desenhar(v, d, tela, t):
+    s = d.s
+    for i in range(5):
+        cai = 20 + i * 10
+        if t < cai:
+            continue
+        x = d.x + (i - 2) * 22 * s
+        y = min(CHAO - 4, -40 + (t - cai) * 30)
+        a = (t - cai) * 0.8 if y < CHAO - 4 else 0.6
+        for k in range(4):
+            ang = a + k * math.pi / 2
+            pts = [(x, y), (x + math.cos(ang) * 9, y + math.sin(ang) * 9), (x + math.cos(ang + 0.6) * 4,
+                                                                            y + math.sin(ang + 0.6) * 4)]
+            pygame.draw.polygon(tela, (200, 204, 214), pts)
+        pygame.draw.circle(tela, (40, 40, 50), (int(x), int(y)), 2)
+
+
+# =====================================================================
+# TRAFO: ENTERRADO (afunda na terra, fica um montinho) + uivo
+# =====================================================================
+def trafo_passo(v, d, t, jogo):
+    pose(v, "t_agacha" if t < 60 else "t_uivo")
+    if 20 <= t < 70:
+        d.cortar_chao = True
+        d.y = CHAO + (t - 20) * 2.2 * d.s
+        if t % 6 == 0:
+            poeira(jogo, d.x, 3)
+    if t == 70:
+        d.esconde = True
+        som.tocar("uivo")
+
+
+def trafo_desenhar(v, d, tela, t):
+    if t < 60:
+        return
+    s = d.s
+    pygame.draw.ellipse(tela, (12, 10, 18), (d.x - 40 * s, CHAO - 16 * s, 80 * s, 30 * s))
+    pygame.draw.ellipse(tela, (110, 76, 44), (d.x - 38 * s, CHAO - 14 * s, 76 * s, 26 * s))
+    pygame.draw.line(tela, (60, 40, 24), (d.x - 6 * s, CHAO - 12 * s), (d.x - 6 * s, CHAO - 30 * s), 3)  # a plaquinha
+    pygame.draw.rect(tela, (200, 170, 120), (d.x - 18 * s, CHAO - 40 * s, 24 * s, 12 * s))
+
+
+# =====================================================================
+# KING RIP: HORA DO CHÁ (senta em cima e toma um chazinho)
+# =====================================================================
+def king_passo(v, d, t, jogo):
+    peito = ponto_do_caido(d, "pc")
+    if t < 30:
+        v.x += (peito[0] - v.x) * 0.15
+        pose(v, "parado")
+    else:
+        v.x = peito[0]
+        v.y = peito[1] + 16 * v.s
+        pose(v, "k_agacha")
+        if t == 30:
+            som.tocar("queda", 0.6)
+
+
+def king_desenhar(v, d, tela, t):
+    if t < 36:
+        return
+    p = v.pose_vista or v.pose_atual()
+    m = v.ponto(p, "mf")
+    s = v.s
+    pygame.draw.rect(tela, (12, 10, 18), (m[0] - 6 * s, m[1] - 9 * s, 12 * s, 10 * s))
+    pygame.draw.rect(tela, (240, 240, 236), (m[0] - 5 * s, m[1] - 8 * s, 10 * s, 8 * s))  # a xícara
+    pygame.draw.circle(tela, (240, 240, 236), (int(m[0] + 6 * s), int(m[1] - 4 * s)), max(2, int(3 * s)), 2)
+    for i in range(3):  # o vapor
+        k = ((t * 0.04) + i / 3) % 1
+        x = m[0] + math.sin(k * 6 + i) * 4 * s
+        pygame.draw.circle(tela, (230, 230, 240), (int(x), int(m[1] - 12 * s - k * 30 * s)), max(1, int(3 * s * (1 - k))))
+
+
+# =====================================================================
+# CANNAN: ENTREGA AÉREA (continência, caixa de paraquedas cai em cima)
+# =====================================================================
+def cannan_passo(v, d, t, jogo):
+    pose(v, "c_continencia")
+    if t == 84:
+        d.esconde = True
+        poeira(jogo, d.x, 14)
+        jogo.tremer(10)
+        som.tocar("queda")
+
+
+def cannan_desenhar(v, d, tela, t):
+    s = d.s
+    y = min(CHAO, -120 + t * 7)
+    caixa = pygame.Rect(0, 0, 70 * s, 54 * s)
+    caixa.midbottom = (int(d.x), int(y))
+    if y < CHAO:  # o paraquedas
+        pygame.draw.arc(tela, (240, 240, 240), (caixa.centerx - 60 * s, caixa.y - 100 * s, 120 * s, 70 * s), 0,
+                        math.pi, 4)
+        for x in (caixa.x, caixa.right):
+            pygame.draw.line(tela, (200, 200, 200), (x, caixa.y), (caixa.centerx, caixa.y - 66 * s), 1)
+    pygame.draw.rect(tela, (12, 10, 18), caixa.inflate(4, 4))
+    pygame.draw.rect(tela, (110, 120, 70), caixa)
+    pygame.draw.line(tela, (70, 80, 40), caixa.topleft, caixa.bottomright, 3)
+    pygame.draw.line(tela, (70, 80, 40), caixa.topright, caixa.bottomleft, 3)
+
+
+# =====================================================================
+# FINN: VIROU SAPO (brilho de magia, puf, um sapinho no lugar)
+# =====================================================================
+def finn_passo(v, d, t, jogo):
+    pose(v, "f_vitoria" if t > 20 else "f_carrega")
+    if t == 60:
+        d.esconde = True
+        puf(jogo, d.x, CHAO - 30, 18, (200, 160, 255))
+        som.tocar("puf")
+    if t > 70 and t % 24 == 0:
+        som.tocar("lingua", 0.3)
+
+
+def finn_desenhar(v, d, tela, t):
+    s = d.s
+    if t < 60:  # as estrelinhas em volta do derrotado
+        for i in range(8):
+            a = t * 0.2 + i * math.tau / 8
+            x, y = d.x + math.cos(a) * 50 * s, CHAO - 30 * s + math.sin(a) * 20 * s
+            pygame.draw.circle(tela, (255, 230, 120), (int(x), int(y)), 3)
+        return
+    s *= 1.6  # (um sapinho bem visível)
+    pulo = abs(math.sin(t * 0.13)) * 14 * s if t % 48 < 24 else 0  # o sapinho pulando
+    x, y = d.x, CHAO - 8 * s - pulo
+    pygame.draw.ellipse(tela, (12, 10, 18), (x - 14 * s, y - 12 * s, 28 * s, 18 * s))
+    pygame.draw.ellipse(tela, (90, 170, 70), (x - 12 * s, y - 10 * s, 24 * s, 14 * s))
+    for k in (-1, 1):
+        pygame.draw.circle(tela, (12, 10, 18), (int(x + k * 6 * s), int(y - 10 * s)), max(2, int(4.4 * s)))
+        pygame.draw.circle(tela, (250, 250, 240), (int(x + k * 6 * s), int(y - 10 * s)), max(1, int(3.4 * s)))
+        pygame.draw.circle(tela, (12, 10, 18), (int(x + k * 6 * s), int(y - 10 * s)), max(1, int(1.4 * s)))
+
+
+# =====================================================================
+# KUN: PRO BARALHO (o derrotado vira uma carta e voa pra mão dele)
+# =====================================================================
+def kun_passo(v, d, t, jogo):
+    pose(v, "k_brinca" if t < 80 else "k_vitoria")
+    if t == 50:
+        d.esconde = True
+        puf(jogo, d.x, CHAO - 30, 10)
+        som.tocar("shuriken")
+
+
+def kun_desenhar(v, d, tela, t):
+    if t < 50:
+        return
+    import kun
+    k = min(1.0, (t - 50) / 40)
+    p = v.pose_vista or v.pose_atual()
+    m = v.ponto(p, "mf")
+    x = d.x + (m[0] - d.x) * suave(k)
+    y = CHAO - 30 + (m[1] - CHAO + 30) * suave(k) - math.sin(k * math.pi) * 80
+    kun.carta(tela, (x, y), (1 - k) * 8, (3.4 - 1.6 * k) * d.s / 1.36 * 1.4, 1, brilha=True)
+
+
+# =====================================================================
+# TROMOS (o antigo Xenomorph): O CASULO (gosma preta cobrindo o derrotado)
+# =====================================================================
+def xeno_passo(v, d, t, jogo):
+    pose(v, "x_vitoria")
+    if t == 10:
+        som.tocar("lingua", 0.5)
+    if t == 70:
+        d.esconde = True
+
+
+def xeno_desenhar(v, d, tela, t):
+    s = d.s
+    k = min(1.0, t / 70)
+    alto = (14 + 26 * k) * s
+    larg = 70 * s
+    r = pygame.Rect(0, 0, larg, alto)
+    r.midbottom = (int(d.x), int(CHAO))
+    pygame.draw.ellipse(tela, (12, 10, 18), r.inflate(6, 6))
+    pygame.draw.ellipse(tela, (36, 40, 50), r)
+    for i in range(4):  # as gotas brilhando
+        gx = r.x + (i + 0.5) * larg / 4
+        pygame.draw.circle(tela, (90, 100, 120), (int(gx), int(r.y + alto * 0.35 + (i % 2) * 6)), max(1, int(2 * s)))
+
+
+# =====================================================================
+# TAI: A SENTADA (pula e senta em cima)
+# =====================================================================
+def tai_passo(v, d, t, jogo):
+    if t < 24:
+        pose(v, "t_shiko")
+    elif t < 44:  # o pulo
+        k = (t - 24) / 20
+        peito = ponto_do_caido(d, "pc")
+        v.x += (peito[0] - v.x) * 0.2
+        v.y = CHAO - math.sin(k * math.pi) * 140 - 4 * v.s * k
+        pose(v, "t_senta")
+    else:
+        peito = ponto_do_caido(d, "pc")
+        v.x, v.y = peito[0], CHAO - 4 * v.s
+        pose(v, "t_senta")
+        if t == 44:
+            jogo.tremer(18)
+            poeira(jogo, d.x, 18)
+            som.tocar("queda")
+            som.tocar("ko", 0.5)
+
+
+def tai_desenhar(v, d, tela, t):
+    if 44 <= t < 70:
+        texto_tela(tela, "PLOFT!", (d.x, CHAO - 150), (255, 230, 120))
+
+
+def texto_tela(tela, txt, pos, cor):
+    from efeitos import texto_grande
+    texto_grande(tela, txt, 28, cor, (int(pos[0]), int(pos[1])))
+
+
+# =====================================================================
+# TAMER: UIVO DA ALCATEIA (3 lobos chegam e uivam em volta)
+# =====================================================================
+def tamer_passo(v, d, t, jogo):
+    pose(v, "t_grito" if t > 50 else "parado")
+    if t == 50:
+        som.tocar("uivo")
+
+
+def tamer_desenhar(v, d, tela, t):
+    import tamer
+    s = d.s
+    for i, (lado, perto) in enumerate(((-1, -90), (1, 90), (1, 40))):
+        k = min(1.0, t / 40)
+        x = d.x + lado * 600 * (1 - suave(k)) + perto * s * 0.7
+        tamer.desenha_lobo(tela, x, CHAO, s / (1.36 / 3) * 1.0, -lado, "uiva" if k >= 1 else "corre", t + i * 9, "cinza")
+
+
+# =====================================================================
+# JOHN: SUMIU! (a caixa mágica cai em cima, abre vazia e sai um coelho)
+# =====================================================================
+def john_passo(v, d, t, jogo):
+    pose(v, "j_tira" if t < 90 else "j_agradece")
+    if t == 40:
+        d.esconde = True
+        som.tocar("queda", 0.5)
+    if t == 90:
+        puf(jogo, d.x, CHAO - 50, 16, (170, 90, 230))
+        som.tocar("puf")
+
+
+def john_desenhar(v, d, tela, t):
+    import john
+    s = d.s
+    y = min(CHAO, -60 + t * 12)
+    caixa = pygame.Rect(0, 0, 60 * s, 90 * s)
+    caixa.midbottom = (int(d.x), int(y))
+    if t < 90:
+        pygame.draw.rect(tela, (12, 10, 18), caixa.inflate(6, 6), border_radius=4)
+        pygame.draw.rect(tela, (100, 40, 150), caixa, border_radius=4)
+        for k in range(3):
+            pygame.draw.circle(tela, (240, 200, 70), (caixa.centerx, int(caixa.y + 20 * s + k * 24 * s)), max(2, int(3 * s)))
+    else:  # abriu: vazia! e sai um coelho
+        k = min(1.0, (t - 90) / 30)
+        john.desenha_coelho(tela, d.x + v.dir * 0 + (-v.dir) * 80 * s * k, CHAO, s * 1.4, -v.dir, t, 0.6)
+
+
+# =====================================================================
+# RIBBAT: REI DA CABEÇA (pula na cabeça do derrotado, ganha coroinha)
+# =====================================================================
+def ribbat_passo(v, d, t, jogo):
+    cabeca = ponto_do_caido(d, "cb")
+    if t < 30:
+        k = t / 30
+        v.x += (cabeca[0] - v.x) * 0.2
+        v.y = CHAO - math.sin(k * math.pi) * 90 - (CHAO - cabeca[1] + 6 * d.s) * k
+    else:
+        v.x, v.y = cabeca[0], cabeca[1] - 6 * d.s
+        if t == 30:
+            som.tocar("lingua", 0.5)
+
+
+def ribbat_desenhar(v, d, tela, t):
+    if t < 34:
+        return
+    import chapeus_ribbat
+    chapeus_ribbat.desenhar(tela, "coroa", v.x, v.y, v.lado(), v.s * 0.84)
+
+
+def craquen_passo(v, d, t, jogo):
+    pose(v, "q_comanda" if t < 90 else "q_ri")
+    if 30 <= t < 90:
+        d.cortar_chao = True
+        d.y = CHAO + (t - 30) * 1.8 * d.s
+    if t == 30:
+        som.tocar("terra")
+    if t == 90:
+        d.esconde = True
+        som.tocar("ultimate", 0.5)
+
+
+def craquen_desenhar(v, d, tela, t):
+    import craquen
+    if t >= 100:
+        return
+    for i, dx in enumerate((-50, 0, 50)):  # 3 tentáculos agarrando e puxando pra baixo
+        k = min(1.0, t / 25) if t < 70 else max(0.0, 1 - (t - 70) / 30)
+        x0 = d.x + dx * d.s
+        alto = 90 * d.s * k
+        pts = [(x0 - 8 * d.s, CHAO), (x0 + math.sin(t * 0.3 + i) * 10 * d.s, CHAO - alto), (x0 + 8 * d.s, CHAO)]
+        pygame.draw.polygon(tela, (20, 10, 26), pts)
+        pygame.draw.polygon(tela, (120, 60, 130), [(x + (x0 - x) * 0.25, y) for x, y in pts])
+    pygame.draw.ellipse(tela, (10, 30, 40), (d.x - 70 * d.s, CHAO - 8 * d.s, 140 * d.s, 16 * d.s))  # o redemoinho
+
+
+# =====================================================================
+# MAGNUS: TOSTADO! (cospe fogo em cima do derrotado e sobra só um montinho fumegando)
+# =====================================================================
+def magnus_passo(v, d, t, jogo):
+    import magnus
+    pose(v, "m_ruge" if t < 20 else "m_atira")
+    if t == 20:
+        som.tocar("explosao", 0.6)
+    if 20 <= t < 80 and t % 2 == 0:
+        x = d.x + (math.sin(t * 0.7) * 30) * d.s
+        magnus.chama(jogo, x, CHAO - 10, 3, 1.6)
+    if t == 80:
+        d.esconde = True
+        puf(jogo, d.x, CHAO - 20, 16, (80, 80, 86))
+    if t > 80 and t % 12 == 0:
+        puf(jogo, d.x, CHAO - 14, 2, (110, 110, 116))
+
+
+def magnus_desenhar(v, d, tela, t):
+    s = d.s
+    if 20 <= t < 80:  # o jato de fogo
+        p = v.pose_vista or v.pose_atual()
+        boca = v.ponto(p, "cb")
+        for i in range(10):
+            k = i / 9
+            x = boca[0] + (d.x - boca[0]) * k
+            y = boca[1] + (CHAO - 30 - boca[1]) * k + math.sin(t * 0.8 + i) * 6
+            pygame.draw.circle(tela, (255, int(200 - 120 * k), 40), (int(x), int(y)), max(3, int((5 + 10 * k) * s)))
+    if t >= 80:  # o montinho tostado
+        r = pygame.Rect(0, 0, 60 * s, 22 * s)
+        r.midbottom = (int(d.x), int(CHAO))
+        pygame.draw.ellipse(tela, (12, 10, 10), r.inflate(6, 6))
+        pygame.draw.ellipse(tela, (40, 34, 30), r)
+        for i in range(3):  # brasinhas
+            pygame.draw.circle(tela, (255, 120 + 40 * ((t // 6 + i) % 2), 40),
+                               (int(r.x + (i + 0.6) * r.w / 3.4), int(r.y + r.h * 0.4)), max(1, int(2 * s)))
+        if t < 120:
+            texto_tela(tela, "TOSTADO!", (d.x, CHAO - 150), (255, 160, 60))
+
+
+# =====================================================================
+# SPHYRUS: VIROU ISCA! (desce um anzol, fisga o derrotado e puxa lá pra cima)
+# =====================================================================
+ISCA_DESCE, ISCA_SOBE = 40, 110
+
+
+def sphyrus_passo(v, d, t, jogo):
+    pose(v, "s_ruge" if t < 30 or t > ISCA_SOBE else "parado")
+    if t == 8:
+        som.tocar("terra", 0.6)
+    if t == ISCA_DESCE:
+        som.tocar("lingua", 0.6)
+    if ISCA_DESCE < t < ISCA_SOBE:  # puxado pro alto, pendurado no anzol
+        d.y = CHAO - (t - ISCA_DESCE) ** 1.4 * 1.1
+    if t == ISCA_SOBE:
+        d.esconde = True
+
+
+def sphyrus_desenhar(v, d, tela, t):
+    s = d.s
+    if t < ISCA_DESCE:
+        y = (CHAO - 60 * s) * t / ISCA_DESCE
+    elif t < ISCA_SOBE:
+        y = d.y - 60 * s
+    else:
+        y = -40
+    x = d.x
+    pygame.draw.line(tela, (230, 230, 230), (x, 0), (x, y), 2)  # a linha de pesca
+    pygame.draw.arc(tela, (180, 180, 190), (x - 10 * s, y - 2, 20 * s, 22 * s), math.pi, 2 * math.pi + 0.6, 3)  # o anzol
+    pygame.draw.line(tela, (180, 180, 190), (x, y - 6), (x, y + 10 * s), 3)
+    if ISCA_DESCE < t < ISCA_SOBE + 50:
+        texto_tela(tela, "VIROU ISCA!", (v.x, CHAO - 170), (140, 220, 255))
+
+
+# =====================================================================
+# FRIGANTUS: SOTERRADO! (a avalanche cobre ele e só a MÃO fica de fora, tremendo)
+# =====================================================================
+def frigantus_passo(v, d, t, jogo):
+    pose(v, "fr_peito_a" if (t // 6) % 2 and t < 30 else "fr_peito_b" if t < 30 else "fr_ruge")
+    if t == 30:
+        som.tocar("terra")
+        som.tocar("explosao", 0.5)
+        jogo.tremer(18)
+    if t == 54:
+        d.esconde = True
+
+
+def frigantus_desenhar(v, d, tela, t):
+    if t < 30:
+        return
+    k = suave(min(1, (t - 30) / 24))
+    x = d.x
+    rnd = __import__("random").Random(3)
+    for i in range(18):  # o monte de neve caindo e cobrindo
+        bx = x + rnd.uniform(-90, 90)
+        by = CHAO - 20 - rnd.uniform(0, 50) - (1 - k) * 300
+        r = rnd.uniform(22, 40)
+        pygame.draw.circle(tela, (240, 244, 252) if i % 3 else (210, 222, 238), (int(bx), int(min(CHAO - 10, by))), int(r))
+    if t >= 54:  # só a mão de fora, tremendo
+        mx = x + 10 + math.sin(t * 1.4) * 2
+        my = CHAO - 70
+        pygame.draw.line(tela, (60, 50, 50), (mx, my + 26), (mx, my), 9)
+        for k2 in (-1, 0, 1):
+            pygame.draw.line(tela, (60, 50, 50), (mx, my), (mx + k2 * 6, my - 10), 4)
+        if t < 120:
+            texto_tela(tela, "SOTERRADO!", (d.x, CHAO - 170), (200, 240, 255))
+
+
+FINISHES = {
+    "MAX-10": dict(passo=max_passo, desenhar=max_desenhar, nome="RECICLADO!"),
+    "RIB": dict(passo=rib_passo, desenhar=rib_desenhar, nome="PRESO NO CHÃO!"),
+    "TRAFO": dict(passo=trafo_passo, desenhar=trafo_desenhar, nome="ENTERRADO!"),
+    "KING RIP": dict(passo=king_passo, desenhar=king_desenhar, nome="HORA DO CHÁ!"),
+    "CANNAN": dict(passo=cannan_passo, desenhar=cannan_desenhar, nome="ENTREGA AÉREA!"),
+    "FINN": dict(passo=finn_passo, desenhar=finn_desenhar, nome="VIROU SAPO!"),
+    "KUN": dict(passo=kun_passo, desenhar=kun_desenhar, nome="PRO BARALHO!"),
+    "TROMOS": dict(passo=xeno_passo, desenhar=xeno_desenhar, nome="CASULO!"),
+    "TAI": dict(passo=tai_passo, desenhar=tai_desenhar, nome="SENTADA!"),
+    "TAMER": dict(passo=tamer_passo, desenhar=tamer_desenhar, nome="UIVO DA ALCATEIA!"),
+    "JOHN": dict(passo=john_passo, desenhar=john_desenhar, nome="SUMIU!"),
+    "RIBBAT": dict(passo=ribbat_passo, desenhar=ribbat_desenhar, nome="REI DA CABEÇA!"),
+    "CRÁQUEN": dict(passo=craquen_passo, desenhar=craquen_desenhar, nome="PRO FUNDO DO MAR!"),
+    "MAGNUS": dict(passo=magnus_passo, desenhar=magnus_desenhar, nome="TOSTADO!"),
+    "SPHYRUS": dict(passo=sphyrus_passo, desenhar=sphyrus_desenhar, nome="VIROU ISCA!"),
+    "FRIGANTUS": dict(passo=frigantus_passo, desenhar=frigantus_desenhar, nome="SOTERRADO!"),
+}
+
+
+def de(l):
+    return FINISHES.get(l.f.get("nome_base", l.f["nome"]).replace("SOMBRA DO ", ""))

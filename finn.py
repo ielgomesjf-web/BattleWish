@@ -75,8 +75,73 @@ def cajado(l, p=None):
     return (m[0] - dx * 34 * esc, m[1] - dy * 34 * esc), (m[0] + dx * 30 * esc, m[1] + dy * 30 * esc)
 
 
-def desenha_cajado(tela, l, p, esc, branco):
+def chapeu_gandalf(tela, P, esc):
+    """GANDALF (roupa do Finn): a aba larga do chapéu e a ponta entortada pra trás."""
+    cinza, escuro, borda = (138, 138, 146), (104, 104, 112), (18, 12, 26)
+    aba = [P(-4.5, 7.2), P(17.5, 7.2), P(17.5, 8.4), P(-4.5, 8.4)]
+    pygame.draw.polygon(tela, borda, [P(-5.3, 6.4), P(18.3, 6.4), P(18.3, 9.2), P(-5.3, 9.2)])
+    pygame.draw.polygon(tela, cinza, aba)
+    pygame.draw.line(tela, escuro, P(-4.2, 8.2), P(17.2, 8.2), max(1, int(esc * 0.6)))
+    ponta = [P(5.6, 0.6), P(7.4, 0.6), P(2.0, -4.6), P(0.6, -3.4)]  # a ponta caindo pra trás
+    pygame.draw.polygon(tela, borda, ponta)
+    pygame.draw.polygon(tela, cinza, [P(5.8, 0.8), P(7.0, 0.8), P(2.2, -4.0), P(1.2, -3.2)])
+
+
+def chapeu_bruxo(tela, P, esc):
+    """FINN BRUXO (Halloween): chapéu de bruxa roxo, bem alto e TORTO, com faixa laranja."""
+    roxo, escuro, borda, laranja = (90, 52, 120), (58, 32, 80), (18, 12, 26), (240, 130, 30)
+    pygame.draw.polygon(tela, borda, [P(-2.6, 6.2), P(15.6, 6.2), P(15.6, 9.0), P(-2.6, 9.0)])
+    pygame.draw.polygon(tela, escuro, [P(-1.8, 7.0), P(14.8, 7.0), P(14.8, 8.2), P(-1.8, 8.2)])
+    cone = [P(1.6, 7.2), P(11.6, 7.2), P(8.6, 0.0), P(7.4, -6.0), P(11.8, -9.4), P(5.6, -6.4), P(4.2, 0.4)]
+    pygame.draw.polygon(tela, borda, cone)
+    pygame.draw.polygon(tela, roxo, [P(2.4, 6.6), P(10.8, 6.6), P(8.0, 0.2), P(7.0, -5.4), P(10.0, -8.2),
+                                     P(6.0, -5.8), P(4.8, 0.6)])
+    pygame.draw.polygon(tela, laranja, [P(2.2, 6.6), P(11.0, 6.6), P(10.4, 5.2), P(2.8, 5.2)])  # a faixa
+    pygame.draw.polygon(tela, (255, 220, 90), [P(6.0, 5.0), P(7.6, 5.0), P(7.6, 6.8), P(6.0, 6.8)], 1)  # a fivela
+
+
+def desenha_vassoura(tela, l, p, esc):
+    """FINN BRUXO: a VASSOURA no lugar do cajado (cabo de madeira e as palhas embaixo)."""
     baixo, cima = cajado(l, p)
+    w = max(2, int(2.4 * esc))
+    pygame.draw.line(tela, PALETA["k"], baixo, cima, w + 2)
+    pygame.draw.line(tela, (130, 86, 46), baixo, cima, w)
+    (dx, dy), _ = eixos(cima, baixo)  # (de cima pra baixo)
+    nx, ny = -dy, dx
+    base = (baixo[0] - dx * 12 * esc, baixo[1] - dy * 12 * esc)
+    ponta = (baixo[0] + dx * 6 * esc, baixo[1] + dy * 6 * esc)
+    palha = [(base[0] + nx * 2.4 * esc, base[1] + ny * 2.4 * esc), (ponta[0] + nx * 7 * esc, ponta[1] + ny * 7 * esc),
+             (ponta[0] - nx * 7 * esc, ponta[1] - ny * 7 * esc), (base[0] - nx * 2.4 * esc, base[1] - ny * 2.4 * esc)]
+    pygame.draw.polygon(tela, PALETA["k"], palha)
+    meio = (sum(q[0] for q in palha) / 4, sum(q[1] for q in palha) / 4)
+    pygame.draw.polygon(tela, (214, 172, 84), [(x * 0.86 + meio[0] * 0.14, y * 0.86 + meio[1] * 0.14) for x, y in palha])
+    for k in (-0.6, -0.2, 0.2, 0.6):  # os fios de palha
+        pygame.draw.line(tela, (160, 120, 50), (base[0] + nx * k * 3 * esc, base[1] + ny * k * 3 * esc),
+                         (ponta[0] + nx * k * 9 * esc, ponta[1] + ny * k * 9 * esc), max(1, int(esc * 0.5)))
+    amarra = (base[0] + dx * 2 * esc, base[1] + dy * 2 * esc)  # a amarração
+    pygame.draw.line(tela, (120, 50, 120), (amarra[0] + nx * 3.4 * esc, amarra[1] + ny * 3.4 * esc),
+                     (amarra[0] - nx * 3.4 * esc, amarra[1] - ny * 3.4 * esc), max(2, int(1.6 * esc)))
+
+
+def desenha_cajado(tela, l, p, esc, branco):
+    if l.f.get("estilo") == "bruxo" and not branco:
+        return desenha_vassoura(tela, l, p, esc)
+    baixo, cima = cajado(l, p)
+    if l.f.get("estilo") == "gandalf" and not branco:  # GANDALF: cajado de madeira retorcida com luz branca
+        w = max(2, int(2.6 * esc))
+        pygame.draw.line(tela, PALETA["k"], baixo, cima, w + 2)
+        pygame.draw.line(tela, (110, 74, 44), baixo, cima, w)
+        (dx, dy), _ = eixos(baixo, cima)
+        nx, ny = -dy, dx
+        for k, (a, r) in enumerate(((0.0, 5), (1.6, 4), (3.4, 3))):  # os galhos enrolados em volta da luz
+            ox = cima[0] + nx * math.cos(a) * r * esc + dx * math.sin(a) * r * esc
+            oy = cima[1] + ny * math.cos(a) * r * esc + dy * math.sin(a) * r * esc
+            pygame.draw.line(tela, PALETA["k"], cima, (ox, oy), max(2, int(2 * esc)))
+            pygame.draw.line(tela, (130, 90, 56), cima, (ox, oy), max(1, int(1.2 * esc)))
+        luz = AMARELO_MAGIA if l.estado == "ataque" and l.nome_golpe == "finn_cajado" else (250, 250, 255)
+        brilho(tela, (int(cima[0]), int(cima[1])), int(9 * esc), luz, 120)
+        pygame.draw.circle(tela, luz, (int(cima[0]), int(cima[1])), max(2, int(2.4 * esc)))
+        return
     w = max(2, int(2.6 * esc))
     pygame.draw.line(tela, PALETA["k"], baixo, cima, w + 2)
     pygame.draw.line(tela, (240, 240, 240) if branco else (128, 84, 44), baixo, cima, w)
@@ -339,15 +404,15 @@ def _registra(nome, **g):
 _registra("finn_fogo", ini=18, ativo=1, rec=24, proj=True, raio=15, vel=8, dano=20, hit=22, defe=14, emp=5,
           nivel="medio", ia="longe", desenho_proj=desenha_fogo, ao_usar=solta_fogo,
           quadros=[(0, "parado"), (10, "f_carrega"), (17, "f_lanca"), (30, "f_lanca"), (43, "parado")])
-_registra("finn_levita", ini=L_INI, ativo=8, rec=L_FIM - L_INI - 8, janelas=((L_INI, L_INI + 8),), dano=10, hit=20,
+_registra("finn_levita", ini=L_INI, ativo=8, rec=L_FIM - L_INI - 8, janelas=((L_INI, L_INI + 8),), dano=12, hit=20,
           defe=10, emp=0, nivel="medio", lanca=15, logica=levitar, efeito=levitar_efeito, ia="medio",
           quadros=[(0, "parado"), (8, "f_levita"), (L_FIM - 8, "f_levita"), (L_FIM, "parado")])
 _registra("finn_cajado", ini=B_INI, ativo=B_HITS * B_INTERVALO, rec=14,
           janelas=tuple((B_INI + k * B_INTERVALO, B_INI + k * B_INTERVALO + 3) for k in range(B_HITS)),
-          caixa=(10, 40, 92, 124), dano=4, hit=12, defe=8, emp=1, nivel="medio", logica=barrage,
+          caixa=(10, 40, 92, 124), dano=5, hit=12, defe=8, emp=1, nivel="medio", logica=barrage,
           efeito=barrage_efeito, ia="perto", quadros=barrage_quadros())
 _registra("finn_empurra", ini=S_INI, ativo=S_FIM - S_INI, rec=12, janelas=((S_INI, S_FIM),), caixa=(0, 20, 60, 120),
-          dano=5, hit=16, defe=10, emp=4, nivel="medio", logica=empurrao, ia="medio", som="vento",
+          dano=7, hit=16, defe=10, emp=4, nivel="medio", logica=empurrao, ia="medio", som="vento",
           quadros=[(0, "parado"), (S_INI - 1, "f_empurra"), (S_FIM, "f_empurra"), (S_FIM + 12, "parado")])
 _registra("finn_sol", ini=0, ativo=1, rec=0, proj=True, raio=40, vel=9, dano=40, hit=40, defe=20, emp=6,
           nivel="medio", derruba=True, voo=(6, 10), ultimate=True, varios=True, atravessa=True)
@@ -541,6 +606,12 @@ MAO = Peca([
 ], PALETA, a=(2, 0), b=(2, 4), estica=False)
 
 
+def _cor(letra):
+    """A cor da paleta seguindo a roupa (o manto é desenhado por código)."""
+    import pecas
+    return (pecas.TROCA or {}).get(letra, PALETA[letra])
+
+
 def _manto(tela, P, esc, branco, var):
     """A saia do manto (cobre as pernas até a canela) com a roupa azul aparecendo no meio."""
     q, jt, jf = P("qd"), P("jt"), P("jf")
@@ -549,14 +620,65 @@ def _manto(tela, P, esc, branco, var):
     esq = min(jt[0], jf[0], q[0] - 6 * esc) - 4 * esc
     dir_ = max(jt[0], jf[0], q[0] + 6 * esc) + 4 * esc
     pts = [(q[0] - 6 * esc, q[1] - 2 * esc), (q[0] + 6 * esc, q[1] - 2 * esc), (dir_, baixo_y), (esq, baixo_y)]
-    cor = (240, 240, 240) if branco else PALETA["r"]
+    cor = (240, 240, 240) if branco else _cor("r")
     pygame.draw.polygon(tela, cor, pts)
-    if not branco:
-        pygame.draw.line(tela, PALETA["v"], pts[1], pts[2], max(1, int(2 * esc)))
-        pygame.draw.line(tela, PALETA["R"], pts[0], pts[3], max(1, int(1 * esc)))
-        pygame.draw.line(tela, PALETA["x"], pts[3], pts[2], max(1, int(2 * esc)))  # barra preta
+    if not branco:  # (as cores seguem a roupa: antes ficava roxo em todas)
+        pygame.draw.line(tela, _cor("v"), pts[1], pts[2], max(1, int(2 * esc)))
+        pygame.draw.line(tela, _cor("R"), pts[0], pts[3], max(1, int(1 * esc)))
+        pygame.draw.line(tela, _cor("x"), pts[3], pts[2], max(1, int(2 * esc)))  # barra preta
         meio_baixo = ((pts[2][0] + pts[3][0]) / 2, baixo_y)
-        pygame.draw.line(tela, PALETA["a"], q, meio_baixo, max(1, int(2 * esc)))  # roupa azul por baixo
+        pygame.draw.line(tela, _cor("a"), q, meio_baixo, max(1, int(2 * esc)))  # roupa azul por baixo
+
+
+def finn_todo_quadro(l, jogo):
+    """As passivas do Finn (ALQUIMIA e FEITIÇO DE CURA) rodam aqui."""
+    import habilidades
+    habilidades.finn_quadro(l, jogo)
+
+
+def runas(tela, a, b, esc, t, branco):
+    """RUNAS brilhando no braço (de a até b): 3 simbolozinhos que pulsam."""
+    if branco:
+        return
+    brilho_ = 0.6 + 0.4 * math.sin(t * 0.1)
+    cor = (int(255 * brilho_), int(230 * brilho_), int(110 * brilho_))
+    for i, f in enumerate((0.25, 0.5, 0.75)):
+        x, y = a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f
+        r = 1.2 * esc
+        if i == 0:  # um "V"
+            pts = [(x - r, y - r), (x, y + r), (x + r, y - r)]
+        elif i == 1:  # um "X"
+            pygame.draw.line(tela, cor, (x - r, y - r), (x + r, y + r), max(1, int(0.6 * esc)))
+            pts = [(x - r, y + r), (x + r, y - r)]
+        else:  # um triângulo
+            pts = [(x, y - r), (x + r, y + r), (x - r, y + r), (x, y - r)]
+        pygame.draw.lines(tela, cor, False, pts, max(1, int(0.6 * esc)))
+
+
+def cinto_alquimista(tela, l, p, esc, branco):
+    """O LIVRO DE FEITIÇOS e as 3 POÇÕES pendurados no cinto."""
+    def U(u):
+        return l.ponto({"_": u}, "_")
+    qd = p["qd"]
+    k = (150, 150, 160) if branco else PALETA["k"]
+    # o livro (do lado de trás do quadril)
+    cantos = [U((qd[0] - 11, qd[1] + 3)), U((qd[0] - 4, qd[1] + 3)), U((qd[0] - 4, qd[1] - 7)), U((qd[0] - 11, qd[1] - 7))]
+    pygame.draw.polygon(tela, k, cantos)
+    capa = (245, 245, 250) if branco else (110, 60, 36)
+    meio = (sum(c[0] for c in cantos) / 4, sum(c[1] for c in cantos) / 4)
+    pygame.draw.polygon(tela, capa, [(x * 0.8 + meio[0] * 0.2, y * 0.8 + meio[1] * 0.2) for x, y in cantos])
+    if not branco:
+        pygame.draw.circle(tela, AMARELO_MAGIA, (round(meio[0]), round(meio[1])), max(1, int(1.1 * esc)))  # o fecho dourado
+    # as poções (vermelha, azul, verde), na frente
+    import habilidades
+    for j, tipo in enumerate(habilidades.POCOES):
+        x, y = U((qd[0] + 2 + j * 4, qd[1] - 4))
+        cor = (245, 245, 250) if branco else habilidades.COR_POCAO[tipo]
+        r = max(2, int(1.7 * esc))
+        pygame.draw.circle(tela, k, (round(x), round(y + r)), r + max(1, int(0.6 * esc)))
+        pygame.draw.circle(tela, cor, (round(x), round(y + r)), r)
+        pygame.draw.line(tela, k, (x, y - r * 0.6), (x, y + r * 0.3), max(2, int(1.4 * esc)))  # gargalo
+        pygame.draw.circle(tela, (255, 255, 255), (round(x - r * 0.35), round(y + r * 0.6)), max(1, r // 3))
 
 
 def desenhar_finn(l, tela, p, branco):
@@ -583,6 +705,8 @@ def desenhar_finn(l, tela, p, branco):
         MAO.desenhar(tela, m, mais(m, dm, 4), esc, espelho, var)
         ANTEBRACO.desenhar(tela, c, m, esc, espelho, var)
         BRACO.desenhar(tela, o, c, esc, espelho, var)
+        if var != "escuro":  # RUNAS brilhando no braço da frente
+            runas(tela, c, m, esc, l.t, branco)
 
     longe, perto = (("cf", "mf", "pf", "jf"), ("ct", "mt", "pt", "jt")) if costas else \
         (("ct", "mt", "pt", "jt"), ("cf", "mf", "pf", "jf"))
@@ -592,12 +716,44 @@ def desenhar_finn(l, tela, p, branco):
     _manto(tela, P, esc, branco, perto_v)
     c, cb = P("pc"), P("cb")
     (TRONCO_COSTAS if costas else TRONCO).desenhar(tela, P("qd"), c, esc, espelho, perto_v)
+    cinto_alquimista(tela, l, p, esc, branco)
     u, _ = cabeca_eixos(c, cb, d)
     pygame.draw.line(tela, PALETA["k"], c, mais(cb, u, -3 * esc), max(3, int(5 * esc)))
     pygame.draw.line(tela, PALETA["P"] if not branco else (240, 240, 240), c, mais(cb, u, -3 * esc), max(1, int(3 * esc)))
-    (CABECA_COSTAS if costas else CABECA).desenhar(tela, cb, mais(cb, u, 10), esc, espelho, perto_v)
+    na_cabeca = (CABECA_COSTAS if costas else CABECA).desenhar(tela, cb, mais(cb, u, 10), esc, espelho, perto_v)
+    if l.f.get("estilo") == "gandalf" and not branco:
+        chapeu_gandalf(tela, na_cabeca, esc)
+    if l.f.get("estilo") == "bruxo" and not branco:
+        chapeu_bruxo(tela, na_cabeca, esc)
     braco(perto[0], perto[1], perto_v)
     desenha_cajado(tela, l, p, esc, branco)
+    efeitos_passiva(tela, l, p, esc, branco)
+
+
+def efeitos_passiva(tela, l, p, esc, branco):
+    """ALQUIMIA: o frasco na mão quando bebe + a aura da poção. FEITIÇO DE CURA: brilhinhos verdes subindo."""
+    import habilidades
+    x = l.extra
+    if branco:
+        return
+    if x.get("bebendo", 0) > 0 and x.get("pocao"):
+        cor = habilidades.COR_POCAO[x["pocao"]]
+        boca = l.ponto({"_": (p["cb"][0] + 6, p["cb"][1] - 6)}, "_")
+        pygame.draw.circle(tela, PALETA["k"], (round(boca[0]), round(boca[1])), max(3, int(2.6 * esc)))
+        pygame.draw.circle(tela, cor, (round(boca[0]), round(boca[1])), max(2, int(2.0 * esc)))
+    aura = "forca" if x.get("pocao_forca", 0) > 0 else "veloz" if x.get("pocao_veloz", 0) > 0 else None
+    if aura and (l.t // 6) % 2 == 0:
+        cor = habilidades.COR_POCAO[aura]
+        for i in range(3):
+            a = l.t * 0.15 + i * 2.1
+            px, py = l.ponto({"_": (math.cos(a) * 14, 40 + math.sin(a * 1.3) * 30)}, "_")
+            pygame.draw.circle(tela, cor, (round(px), round(py)), max(1, int(1.2 * esc)))
+    if x.get("curando", 0) > 0:
+        k = x["curando"] / 30
+        for i in range(5):
+            px, py = l.ponto({"_": (-14 + i * 7, 30 + (1 - k) * 60 + i * 6)}, "_")
+            pygame.draw.line(tela, (110, 240, 120), (px - 1.4 * esc, py), (px + 1.4 * esc, py), max(1, int(0.8 * esc)))
+            pygame.draw.line(tela, (110, 240, 120), (px, py - 1.4 * esc), (px, py + 1.4 * esc), max(1, int(0.8 * esc)))
 
 
 def figura_extra(q, P, s, d, cor, escura, cont, branco, t):

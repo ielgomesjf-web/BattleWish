@@ -17,13 +17,27 @@ def provocar(l, outro, jogo):
         som.tocar("blip")
     l.vx = 0
     l.fisica(jogo)
+    if f.get("provocacao_passo"):  # (provocação da loja com gesto próprio)
+        f["provocacao_passo"](l, jogo)
     if l.t == PROVOCA_TEMPO - 12:  # terminou a provocação sem apanhar: enche a barra
-        l.barra = min(BARRA_MAX, l.barra + PROVOCA_BARRA)
+        l.encher(PROVOCA_BARRA)
         l.provocou += 1
         l.memo["encheu"] = l.t
         som.tocar("carga", 0.5)
     if l.t >= PROVOCA_TEMPO:
         return "fim"
+
+
+def linhas(frase, maximo=28):
+    """Frase comprida (até uns 50 letras) vira 2 linhas, quebrando no espaço mais perto do meio."""
+    if len(frase) <= maximo:
+        return [frase]
+    meio = len(frase) // 2
+    espacos = [i for i, c in enumerate(frase) if c == " "]
+    if not espacos:
+        return [frase]
+    i = min(espacos, key=lambda k: abs(k - meio))
+    return [frase[:i], frase[i + 1:]]
 
 
 def provocar_efeito(l, tela):
@@ -32,15 +46,23 @@ def provocar_efeito(l, tela):
     p = l.pose_vista or l.pose_atual()
     cx, cy = l.ponto(p, "cb")
     if l.t >= 6:
-        img = fonte(15).render(f.get("provocacao", "Vem!"), True, (20, 16, 30))
-        r = img.get_rect(midbottom=(cx, cy - 34 * l.s))
+        imgs = [fonte(15).render(lin, True, (20, 16, 30)) for lin in linhas(f.get("provocacao", "Vem!"))]
+        w = max(i.get_width() for i in imgs)
+        h = sum(i.get_height() for i in imgs)
+        r = pygame.Rect(0, 0, w, h)
+        r.midbottom = (cx, cy - 34 * l.s)
         r.clamp_ip(pygame.Rect(4, 4, LARGURA - 8, ALTURA - 8))
         caixa = r.inflate(18, 12)
         pygame.draw.rect(tela, (12, 10, 20), caixa.inflate(4, 4), border_radius=10)
         pygame.draw.rect(tela, (250, 248, 236), caixa, border_radius=9)
         pygame.draw.polygon(tela, (250, 248, 236), [(cx - 6, caixa.bottom - 1), (cx + 6, caixa.bottom - 1),
                                                     (cx, caixa.bottom + 9)])
-        tela.blit(img, r)
+        y = r.y
+        for img in imgs:  # (frase comprida: 2 linhas, cada uma no meio)
+            tela.blit(img, (r.centerx - img.get_width() // 2, y))
+            y += img.get_height()
+    if f.get("provocacao_desenho"):  # (provocação da loja: o desenho do gesto)
+        f["provocacao_desenho"](l, tela)
     if "encheu" in l.memo:
         k = l.t - l.memo["encheu"]
         pygame.draw.circle(tela, (120, 200, 255), (int(l.x), int(l.y - 60 * l.s)), int((20 + k * 6) * l.s / 1.4), 3)

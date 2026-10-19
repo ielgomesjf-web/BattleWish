@@ -7,6 +7,7 @@ import pygame
 from config import *  # noqa: F401,F403
 from efeitos import fonte, texto, texto_grande
 from lutador import Lutador
+import maestria
 
 CARTA = 112          # tamanho de referência do retrato (a loja usa outro tamanho)
 CARTA_GRADE = 60     # retratos da grade de seleção (tipo Injustice 2: vários pequenininhos)
@@ -60,6 +61,11 @@ class TelaSelecao:
         self.titulo = titulo        # (ex: "TRIO: ESCOLHA O 2º LUTADOR")
         self.rotulo2 = rotulo2      # "CPU" ou "2P" (dois jogadores no mesmo PC)
         self.lista = personagens
+        import save
+        for f in personagens:  # a última passiva que ele escolheu (Trafo, Sphyrus)
+            salva = save.d().get("passivas", {}).get(f["nome"])
+            if f.get("habilidades_opcoes") and salva in f["habilidades_opcoes"]:
+                f["habilidade"] = salva
         self.so_um = so_um          # treino: só escolhe o seu
         self.cartas = [retrato(f, CARTA_GRADE) for f in personagens] + [interrogacao(CARTA_GRADE)]
         self.cursor = [0, min(1, len(personagens) - 1)]
@@ -107,6 +113,9 @@ class TelaSelecao:
             if f and f.get("habilidades_opcoes"):
                 ops = f["habilidades_opcoes"]
                 f["habilidade"] = ops[(ops.index(f["habilidade"]) + 1) % len(ops)]
+                import save
+                save.d().setdefault("passivas", {})[f["nome"]] = f["habilidade"]  # (lembra na próxima luta)
+                save.salvar()
         elif tecla in (pygame.K_q, pygame.K_e) and q == 0:  # troca a roupa
             f = self.ficha_do_cursor(0)
             if f:
@@ -198,6 +207,16 @@ class TelaSelecao:
             texto_grande(tela, ficha["nome"], 26, BRANCO if confirmado else (210, 210, 230), (x, 396))
             if not confirmado:
                 texto(tela, "1P" if lado == 0 else self.rotulo2, 16, cor, (x, 424))
+            if lado == 0:  # MAESTRIA: o nível e o título
+                n = maestria.nivel(ficha)
+                tit = maestria.titulo(ficha)
+                import passe
+                evento = passe.titulo_escolhido()  # TÍTULO DO EVENTO (do passe): fica no lugar do de maestria
+                if evento:
+                    texto(tela, f"NÍVEL {n}  {evento}", 13, (255, 150, 50), (x, 444))
+                else:
+                    texto(tela, f"NÍVEL {n}" + (f"  {tit}" if tit else ""), 13,
+                          maestria.moldura(ficha) or (190, 190, 210), (x, 444))
             if lado == 0 and self.quem == 0:
                 import roupas
                 import save
@@ -224,6 +243,8 @@ class TelaSelecao:
             if i < len(self.lista):  # faixinha com a cor do lutador
                 pygame.draw.rect(tela, self.lista[i]["cor"], (r.x, r.bottom - 5, r.w, 5))
             pygame.draw.rect(tela, (12, 10, 20), r, 2)
+            if i < len(self.lista) and maestria.moldura(self.lista[i]):  # MAESTRIA: moldura bronze/prata/ouro...
+                maestria.desenhar_moldura(tela, r, self.lista[i], self.t)
             for k, lado in enumerate(cursores.get(i, [])):
                 cor = AZUL if lado == 0 else VERMELHO
                 pisca = 3 if (self.t // 10) % 2 else 4
@@ -265,15 +286,23 @@ def quebrar(txt, tam, largura):
     return linhas + [atual] if atual else linhas
 
 
-def balao(tela, txt, lado, letras):
-    """Balão de fala em cima do lutador (as letras vão aparecendo uma por uma)."""
+def balao(tela, txt, lado, letras, alvo=None):
+    """Balão de fala em cima do lutador (as letras vão aparecendo uma por uma).
+    alvo = (x, y) pra onde a pontinha aponta (na luta: a cabeça de quem fala)."""
     tam = 17
     linhas = quebrar(txt, tam, 300)
     alt = len(linhas) * 24 + 22
-    cx = 250 if lado == 0 else LARGURA - 250
-    r = pygame.Rect(cx - 170, 30, 340, alt)
-    ponta = (cx - 60 if lado == 0 else cx + 60, r.bottom + 22)
-    base = (cx - 90, r.bottom - 2) if lado == 0 else (cx + 90, r.bottom - 2)
+    if alvo is None:
+        cx = 250 if lado == 0 else LARGURA - 250
+        r = pygame.Rect(cx - 170, 30, 340, alt)
+        ponta = (cx - 60 if lado == 0 else cx + 60, r.bottom + 22)
+        base = (cx - 90, r.bottom - 2) if lado == 0 else (cx + 90, r.bottom - 2)
+    else:
+        cx = max(176, min(LARGURA - 176, alvo[0] + (60 if lado == 0 else -60)))
+        topo = max(64, alvo[1] - 26 - alt)
+        r = pygame.Rect(cx - 170, topo, 340, alt)
+        ponta = (alvo[0], r.bottom + 22)
+        base = (max(r.x + 30, min(r.right - 30, alvo[0] + (14 if lado == 0 else -14))), r.bottom - 2)
     pygame.draw.polygon(tela, (12, 10, 20), [(base[0] - 16, base[1]), (base[0] + 16, base[1]), ponta])
     pygame.draw.rect(tela, (12, 10, 20), r.inflate(8, 8), border_radius=16)
     pygame.draw.rect(tela, (250, 248, 236), r, border_radius=14)
@@ -292,11 +321,12 @@ class TelaVS:
     """Os dois grandões frente a frente antes da luta (e trocando umas provocações)."""
     FALA1, FALA2, DEPOIS = 34, 130, 110  # quando cada um fala (e quanto tempo fica depois da última)
 
-    def __init__(self, f1, f2):
+    def __init__(self, f1, f2, com_falas=False):
         import falas
         self.f = (f1, f2)
         self.t = 0
-        self.falas = falas.dialogo(f1, f2)
+        # (v2.0: as falas passaram pra ENTRADA da luta, cada um fala na arena; aqui só com com_falas=True)
+        self.falas = falas.dialogo(f1, f2) if com_falas else []
         self.DURACAO = self.FALA2 + max(60, len(self.falas[-1][1]) * 2) + self.DEPOIS if self.falas else 150
         self.l = [Lutador(f1, 0, 1), Lutador(f2, 0, -1)]
         for l, f in zip(self.l, self.f):
@@ -329,6 +359,8 @@ class TelaVS:
             l.desenhar(tela)
             nome_x = 230 if lado == 0 else LARGURA - 230
             texto_grande(tela, self.f[lado]["nome"], 34, BRANCO, (nome_x, 506))
+            if self.f[lado].get("nome_completo"):  # o nome inteiro, pequenininho embaixo
+                texto(tela, self.f[lado]["nome_completo"], 14, (200, 200, 220), (nome_x, 530))
         if t > 14:  # o VS estourando
             e = 1 + max(0, (26 - t) / 12) * 1.5
             pygame.draw.line(tela, (255, 240, 200), (meio + 80, 0), (meio - 80, ALTURA), 6)
@@ -342,6 +374,8 @@ class TelaVS:
             comeca = self.FALA1 if i == 0 else self.FALA2
             if t >= comeca:
                 balao(tela, txt, lado, (t - comeca) * 2)
+        import rivais  # RIVAIS: a faixa "RIVAIS!" com o lema (só se forem rivais)
+        rivais.desenhar_faixa(tela, self.f[0], self.f[1], self.t)
         texto(tela, "ENTER pula", 13, (220, 220, 230), (LARGURA - 60, ALTURA - 14))
 
 

@@ -11,7 +11,10 @@ from efeitos import texto, texto_grande
 
 # de onde pra onde (os cenários são vizinhos)
 DESTINOS = {"FERRO-VELHO": "CAMPO DE BATALHA", "CAMPO DE BATALHA": "FERRO-VELHO", "DOJO": "TEMPLO",
-            "TEMPLO": "DOJO", "PÂNTANO": "TOCA", "TOCA": "PÂNTANO", "TORRE DO MAGO": "TEMPLO", "CASSINO": "DOJO", "LABORATÓRIO": "CAMPO DE BATALHA", "ARENA DE SUMÔ": "DOJO", "SELVA": "PÂNTANO", "VILA DOS SAPOS": "PÂNTANO"}
+            "TEMPLO": "DOJO", "PÂNTANO": "TOCA", "TOCA": "PÂNTANO", "TORRE DO MAGO": "TEMPLO", "CASSINO": "DOJO", "LABORATÓRIO": "CAMPO DE BATALHA", "ARENA DE SUMÔ": "DOJO", "SELVA": "PÂNTANO", "VILA DOS SAPOS": "PÂNTANO",
+            "TEATRO DE MÁGICA": "CASSINO", "NAVIO FANTASMA": "PÂNTANO",
+            "CERCADO DO DESERTO": "CAMPO DE BATALHA", "PRAIA DA ILHA": "NAVIO FANTASMA",
+            "MONTANHA NEVADA": "TOCA"}
 DANO = 12
 VEL_MINIMA = 6         # voando mais rápido que isso (ou de golpe forte) atravessa a parede
 BATE, VOA, FIM = 22, 58, 90
@@ -63,6 +66,10 @@ class Transicao:
         if self.t == VOA:  # chegou no cenário novo
             import cenarios
             p.cena = cenarios.cenario(self.destino)
+            import clima
+            import objetos
+            p.objetos = objetos.criar(p.cena.nome)  # (o cenário novo tem o objeto e o clima dele)
+            p.clima = clima.criar(p.cena.nome)
             v, a = self.vitima, self.atacante
             v.mudar("caido")
             v.x, v.y, v.vx, v.vy = LARGURA / 2 + self.lado * 170, CHAO, 0, 0

@@ -216,6 +216,7 @@ class Online:
             p = self.partida = Partida(f1[0], f2[0], ControleRede(), ControleRede(), cenario_nome=self.cenario)
         p.semente = self.semente
         p.online = True
+        p.lado_humano = self.eu  # (MAESTRIA: só o meu lado conta aqui)
         p.regras.update(self.regras)
         self.lock = Lockstep(self.con, self.semente % 65536)
         self.controle = Computador("MÉDIO") if self.robo else Jogador()
@@ -540,11 +541,16 @@ class Online:
                 self.acao_torneio(pular=True)
         elif self.estado == "local":
             if k in (pygame.K_RETURN, pygame.K_SPACE):
-                if self.partida.fase == "fim":
+                if self.partida.replay_tocando():
+                    self.partida.pular_replay()
+                elif self.partida.fase == "fim":
                     som.tocar("confirma")
                     self.terminar_luta_torneio()
                 elif self.luta_tipo == "assistir" and k == pygame.K_RETURN:
                     self.pular_assistida()
+        elif self.estado == "fim" and self.partida.replay_tocando():
+            if k in (pygame.K_RETURN, pygame.K_SPACE):
+                self.partida.pular_replay()
         elif self.estado == "fim":
             if k in (pygame.K_RETURN, pygame.K_SPACE):
                 som.tocar("confirma")

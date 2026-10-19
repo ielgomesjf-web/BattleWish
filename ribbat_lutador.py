@@ -473,22 +473,119 @@ GOLPES_RIBBAT = {"E": "ribbat_lingua", "SHIFT": "ribbat_investida", "Z": "ribbat
 
 
 # =====================================================================
-# ENTRADA: chega pulando de longe (que nem no jogo dele)
+# ENTRADA (ideia do Gomes): chega pulando EM CIMA DE UMA FORMIGA e depois PEGA UMA MOSCA com a língua
+# (a formiga e a mosca são os desenhos do jogo dele, de Ribbat/desenho.py)
 # =====================================================================
+E_CAI, E_MOSCA, E_LINGUA, E_ENGOLE = 36, 40, 74, 90
+
+
+def _formiga_bruta(amassada, d, anim):
+    """A formiga do jogo dele (desenhar_formiga), numa imagem de 40x30 com os pés em y=24."""
+    sup = pygame.Surface((40, 30), pygame.SRCALPHA)
+    cor, escura = (128, 48, 32), (70, 24, 14)
+    if amassada:  # PLOFT: virou panqueca
+        pygame.draw.ellipse(sup, cor, (4, 19, 32, 6))
+        for px in (8, 16, 24, 32):
+            pygame.draw.line(sup, escura, (px, 22), (px + 3, 25), 2)
+        return sup
+    x, y, w, h = 7, 8, 26, 16
+    meio = x + w / 2
+    by = y + h - 8
+    for i, px in enumerate((-6, 0, 6)):
+        o = math.sin(anim + i * 2) * 3
+        pygame.draw.line(sup, escura, (meio + px, by), (meio + px - 4 + o, y + h), 2)
+        pygame.draw.line(sup, escura, (meio + px, by), (meio + px + 4 - o, y + h), 2)
+    pygame.draw.ellipse(sup, cor, (meio - d * 9 - 8, by - 7, 16, 12))
+    pygame.draw.circle(sup, cor, (int(meio), int(by - 1)), 4)
+    hx, hy = meio + d * 9, by - 3
+    pygame.draw.circle(sup, cor, (int(hx), int(hy)), 6)
+    pygame.draw.circle(sup, (255, 255, 255), (int(hx + d * 2), int(hy - 1)), 2)
+    mexe = math.sin(anim * 0.7) * 2
+    pygame.draw.line(sup, escura, (hx, hy - 4), (hx + d * 7, hy - 11 + mexe), 2)
+    pygame.draw.line(sup, escura, (hx - d * 2, hy - 5), (hx + d * 2, hy - 13 - mexe), 2)
+    return sup
+
+
+def _mosca_bruta(t):
+    """A mosca do jogo dele (desenhar_mosca), centrada em (15, 14) numa imagem de 30x24."""
+    sup = pygame.Surface((30, 24), pygame.SRCALPHA)
+    x, y = 15, 14
+    asa = 3 + abs(math.sin(t * 0.42)) * 5
+    pygame.draw.ellipse(sup, (215, 235, 250), (x - 9, y - 4 - asa, 9, asa + 2))
+    pygame.draw.ellipse(sup, (215, 235, 250), (x, y - 4 - asa, 9, asa + 2))
+    pygame.draw.ellipse(sup, (50, 50, 60), (x - 6, y - 4, 12, 8))
+    pygame.draw.circle(sup, (210, 40, 40), (int(x + 5), int(y - 1)), 2)
+    return sup
+
+
+def _formiga_x(l, t):
+    xf = l.extra["entrada_x"]
+    return xf + l.dir * 70 * (1 - min(1, t / E_CAI))  # vem andando até onde ele vai cair
+
+
+def _mosca_pos(l, t):
+    xf = l.extra["entrada_x"]
+    alvo = (xf + l.dir * 86 * l.s, CHAO - 34 * l.s)
+    if t < E_LINGUA:  # chega zumbindo de cima
+        k = suave(min(1, (t - E_MOSCA) / (E_LINGUA - E_MOSCA - 6)))
+        x = alvo[0] + l.dir * 160 * (1 - k) + math.sin(t * 0.5) * 10
+        y = alvo[1] - 180 * (1 - k) + math.cos(t * 0.7) * 8
+        return x, y
+    if t < E_LINGUA + 6:
+        return alvo
+    k = (t - E_LINGUA - 6) / (E_ENGOLE - E_LINGUA - 6)  # vem grudada na língua
+    bx, by = boca(l)
+    return alvo[0] + (bx - alvo[0]) * k, alvo[1] + (by - alvo[1]) * k
+
+
 def entrada(l, t, jogo):
     xf = l.extra["entrada_x"]
-    if t < 36:
-        k = t / 36
+    if t < E_CAI:  # o pulão de longe...
+        k = t / E_CAI
         l.x = xf - l.dir * 420 * (1 - k)
         l.y = CHAO - math.sin(k * math.pi) * 200
         l.sobrepor = dict(POSES_RIB["r_corre2"])
-    else:
-        if t == 36:
-            l.x, l.y = xf, CHAO
+    elif t < E_CAI + 14:  # ...EM CIMA DA FORMIGA (e quica)
+        if t == E_CAI:
             som.tocar("queda", 0.6)
-            fumaca(jogo, l.x, CHAO - 4, 8, (150, 130, 100), 3, -1)
-        l.sobrepor = dict(POSES_RIB["r_cruzado"]) if t < 90 else {}
+            som.tocar("puf", 0.5)
+            fumaca(jogo, xf, CHAO - 4, 8, (150, 130, 100), 3, -1)
+        k = (t - E_CAI) / 14
+        l.x, l.y = xf, CHAO - math.sin(k * math.pi) * 40
+    else:
+        l.x, l.y = xf, CHAO
+        if t == E_LINGUA:
+            som.tocar("lingua")
+        if t == E_ENGOLE:
+            som.tocar("confirma", 0.4)  # GLUP
+        l.sobrepor = dict(POSES_RIB["r_cruzado"]) if t > E_ENGOLE else {}
     l.t += 1
+
+
+def entrada_efeito(l, tela, t):
+    e = l.s * TAMANHO * 1.25
+    # a FORMIGA
+    if t < E_CAI + 40:
+        d = -l.dir
+        img = _formiga_bruta(t >= E_CAI, d, t * 0.4)
+        w, h = int(40 * e), int(30 * e)
+        img = pygame.transform.smoothscale(img, (w, h))
+        if t >= E_CAI + 20:
+            img.set_alpha(int(255 * (1 - (t - E_CAI - 20) / 20)))
+        x = _formiga_x(l, t)
+        tela.blit(img, (x - w / 2, CHAO - 24 * e))
+    # a MOSCA e a LÍNGUA
+    if E_MOSCA <= t < E_ENGOLE:
+        mx, my = _mosca_pos(l, t)
+        if t >= E_LINGUA:
+            bx, by = boca(l)
+            pygame.draw.line(tela, (120, 30, 50), (bx, by), (mx, my), int(7 * l.s))
+            pygame.draw.line(tela, (235, 110, 140), (bx, by), (mx, my), int(4 * l.s))
+            pygame.draw.circle(tela, (235, 110, 140), (int(mx), int(my)), int(5 * l.s))
+        img = pygame.transform.smoothscale(_mosca_bruta(t), (int(30 * e), int(24 * e)))
+        if l.dir < 0:
+            img = pygame.transform.flip(img, True, False)
+        tela.blit(img, (mx - 15 * e, my - 14 * e))
 
 
 def vitoria(l, t, jogo):
@@ -500,7 +597,8 @@ def vitoria(l, t, jogo):
 RIBBAT = dict(nome="RIBBAT", cor=(112, 186, 80), vida=100, vel=4.6, pulo=18.5, forca=1.0, tam=1.24, altura=0.36,
               cor_poder=(236, 184, 52), desenho=desenhar_ribbat, golpes=GOLPES_RIBBAT, poses=POSES_RIBBAT,
               figura_extra=figura_ribbat, secreto=True, codigo=CODIGO,
-              provocacao="RIBBIT!", cenario="PÂNTANO", entrada=entrada, vitoria=vitoria,
+              provocacao="RIBBIT!", cenario="PÂNTANO", entrada=entrada, entrada_efeito=entrada_efeito,
+              vitoria=vitoria,
               provocacao_quadros=[(0, "parado"), (8, "r_cruzado"), (58, "r_cruzado"), (70, "parado")],
               nomes={"E": "LINGUADA (35)", "Q": "-", "R": "-", "SHIFT": "INVESTIDA (50)",
                      "Z": "OS CHEFÕES (HIT KILL)"})

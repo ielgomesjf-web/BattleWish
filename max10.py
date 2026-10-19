@@ -88,14 +88,16 @@ _brilhos = {}
 
 
 def brilho(tela, pos, raio, cor, alfa):
-    """Bolinha de luz transparente (guardada pronta, pra não criar de novo todo quadro)."""
+    """Luz transparente em degradê (guardada pronta, pra não criar de novo todo quadro)."""
     if raio < 1:
         return
     chave = (raio, cor, alfa // 8)
     sup = _brilhos.get(chave)
     if sup is None:
         sup = pygame.Surface((raio * 2, raio * 2), pygame.SRCALPHA)
-        pygame.draw.circle(sup, (*cor, alfa // 8 * 8), (raio, raio), raio)
+        a = alfa // 8 * 8
+        for i in range(8, 0, -1):  # um degradê: forte no meio, sumindo na borda (luz, não bolha)
+            pygame.draw.circle(sup, (*cor, int(a * (1 - (i - 1) / 8) ** 1.7)), (raio, raio), max(1, raio * i // 8))
         if len(_brilhos) < 600:
             _brilhos[chave] = sup
     tela.blit(sup, (pos[0] - raio, pos[1] - raio))
@@ -723,6 +725,50 @@ MAO = Peca([
 ], PALETA, a=(2, 0), b=(2, 4), estica=False)
 
 
+# ---- o REMODEL do Gomes (desenhado por ele no Paint): OMBREIRAS, QR CODE na testa e LANÇA-MÍSSEIS no cotovelo ----
+OMBREIRA = Peca([
+    "...kkkkkk...",
+    ".kkGGGGggkk.",
+    "kGGGgggggggk",
+    "kGgggggggddk",
+    "kSSSSSssssmk",
+    "kkkkkkkkkkkk",
+    "...kmmk.....",
+    "...kmmk.....",
+    "....kk......",
+], PALETA, a=(6, 4), b=(6, 9), estica=False)
+
+LANCA_MISSEIS = Peca([
+    ".kkkkk.",
+    "kSSSsmk",
+    "kSsssmk",
+    "kSsssmk",
+    "kmmmmmk",
+    "kSsssmk",
+    "kSsssmk",
+    "krkrkrk",
+    ".kkkkk.",
+], PALETA, a=(-1, 1), b=(-1, 8), estica=False)
+
+QR = ("101",
+      "010",
+      "111")
+
+
+def qr_code(tela, P, esc):
+    """O QR CODE na testa do capacete (quadradinhos pretos e brancos, seguem o giro da cabeça)."""
+    x0, y0, c = 3.0, 1.3, 0.85
+    fundo = [P(x0 - 0.25, y0 - 0.25), P(x0 + 3 * c + 0.25, y0 - 0.25), P(x0 + 3 * c + 0.25, y0 + 3 * c + 0.25),
+             P(x0 - 0.25, y0 + 3 * c + 0.25)]
+    pygame.draw.polygon(tela, (240, 240, 236), fundo)
+    for j, linha in enumerate(QR):
+        for i, ch in enumerate(linha):
+            if ch == "1":
+                pygame.draw.polygon(tela, (20, 18, 22), [P(x0 + i * c, y0 + j * c), P(x0 + (i + 1) * c, y0 + j * c),
+                                                        P(x0 + (i + 1) * c, y0 + (j + 1) * c),
+                                                        P(x0 + i * c, y0 + (j + 1) * c)])
+
+
 def _mola(tela, a, b, w, cor):
     """Braço esticado: uma mola de metal."""
     dx, dy = b[0] - a[0], b[1] - a[1]
@@ -770,14 +816,49 @@ def desenhar_robo(l, tela, p, branco):
     braco(longe[0], longe[1], longe_v, mola == longe[4])
     perna(longe[2], longe[3], longe_v)
     c, cb = P("pc"), P("cb")
+    ob = (c[0] - 6 * esc * d, c[1] + 2 * esc)  # (as ombreiras ficam retas, saindo pros lados, como o Gomes desenhou)
+    OMBREIRA.desenhar(tela, ob, (ob[0], ob[1] + 10), esc, espelho, longe_v)
     u, _ = cabeca_eixos(c, cb, d)
     # pescoço
     pygame.draw.line(tela, PALETA["k"], c, mais(cb, u, -3 * esc), max(3, int(4 * esc)))
     pygame.draw.line(tela, PALETA["m"] if not branco else (200, 200, 205), c, mais(cb, u, -3 * esc), max(1, int(2 * esc)))
     (TRONCO_COSTAS if costas else TRONCO).desenhar(tela, P("qd"), c, esc, espelho, perto_v)
     perna(perto[2], perto[3], perto_v)
-    (CABECA_COSTAS if costas else CABECA).desenhar(tela, cb, mais(cb, u, 10), esc, espelho, perto_v)
+    na_cabeca = (CABECA_COSTAS if costas else CABECA).desenhar(tela, cb, mais(cb, u, 10), esc, espelho, perto_v)
+    if l.f.get("estilo") == "frankenrobo" and not branco:
+        frankenrobo(tela, l, na_cabeca, esc)
+    elif not costas and not branco:
+        qr_code(tela, na_cabeca, esc)
     braco(perto[0], perto[1], perto_v, mola == perto[4])
+    if mola != perto[4]:
+        LANCA_MISSEIS.desenhar(tela, P(perto[0]), P(perto[1]), esc, espelho, perto_v)
+    of = (c[0] + 3 * esc * d, c[1] + 2 * esc)
+    OMBREIRA.desenhar(tela, of, (of[0], of[1] + 10), esc, espelho, perto_v)
+
+
+def frankenrobo(tela, l, P, esc):
+    """MAX-10 FRANKENROBÔ (Halloween): parafusos no pescoço, costura na testa e RAIOS saindo da cabeça."""
+    k = PALETA["k"]
+    a, b = P(-3.4, 9.0), P(0.6, 9.0)  # o parafuso de trás (sai pra fora)
+    pygame.draw.line(tela, k, a, b, max(4, int(3.0 * esc)))
+    pygame.draw.line(tela, (170, 172, 180), a, b, max(2, int(1.8 * esc)))
+    pygame.draw.circle(tela, k, P(-3.6, 9.0), max(3, int(1.9 * esc)))
+    pygame.draw.circle(tela, (214, 216, 224), P(-3.6, 9.0), max(2, int(1.3 * esc)))
+    o = P(4.0, 9.4)  # o da frente (de pontinha)
+    pygame.draw.circle(tela, k, o, max(3, int(2.0 * esc)))
+    pygame.draw.circle(tela, (190, 192, 200), o, max(2, int(1.4 * esc)))
+    pygame.draw.line(tela, k, (o[0] - esc, o[1]), (o[0] + esc, o[1]), 1)
+    pygame.draw.line(tela, k, P(2.0, 2.2), P(8.4, 2.6), max(1, int(0.7 * esc)))  # a costura na testa
+    for x in (2.8, 4.4, 6.0, 7.6):
+        pygame.draw.line(tela, k, P(x, 1.6), P(x + 0.2, 3.2), max(1, int(0.6 * esc)))
+    if l.t % 50 < 8:  # os RAIOS (piscam de vez em quando, com estalo de luz)
+        for lado in (-1, 1):
+            pts = [P(5 + lado * 2, 0)]
+            for i in range(1, 4):
+                pts.append(P(5 + lado * (2 + i * 2.2) + (1.6 if (i + l.t // 2) % 2 else -1.6), -i * 2.6))
+            brilho(tela, pts[1], int(6 * esc), (200, 255, 140), 120)
+            pygame.draw.lines(tela, (150, 255, 120), False, pts, max(2, int(1.4 * esc)))
+            pygame.draw.lines(tela, (255, 255, 230), False, pts, max(1, int(0.6 * esc)))
 
 
 def figura_extra(q, P, s, d, cor, escura, cont, branco, t):

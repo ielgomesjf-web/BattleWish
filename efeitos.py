@@ -337,3 +337,18 @@ def texto_botao(tela, botao, resto, tam, cor, centro):
     r = img.get_rect(midleft=(x0 + wb + 6, centro[1]))
     tela.blit(fonte(tam).render(resto, True, PRETO), r.move(2, 2))
     tela.blit(img, r)
+
+
+def doce(tela, pos, r, t=0):
+    """O DOCE do Halloween (balinha embrulhada, laranja com listras), centro em pos."""
+    x, y = pos
+    balanca = math.sin(t * 0.08) * 0.15
+    for lado in (-1, 1):  # as pontinhas do papel torcido
+        pts = [(x + lado * r * 0.8, y), (x + lado * r * 1.7, y - r * (0.7 + balanca)), (x + lado * r * 1.7, y + r * (0.7 - balanca))]
+        pygame.draw.polygon(tela, (40, 20, 10), [(px + lado, py) for px, py in pts])
+        pygame.draw.polygon(tela, (255, 190, 80), pts)
+    pygame.draw.circle(tela, (40, 20, 10), (int(x), int(y)), int(r) + 2)
+    pygame.draw.circle(tela, (245, 120, 30), (int(x), int(y)), int(r))
+    for k in (-1, 0, 1):  # as listras
+        pygame.draw.line(tela, (255, 230, 170), (x + k * r * 0.45 - r * 0.25, y - r * 0.8), (x + k * r * 0.45 + r * 0.25, y + r * 0.8), 2)
+    pygame.draw.circle(tela, (255, 245, 220), (int(x - r * 0.35), int(y - r * 0.4)), max(1, int(r * 0.22)))

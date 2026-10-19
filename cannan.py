@@ -180,7 +180,7 @@ def corre_quadros():
 # =====================================================================
 # Z: ULTIMATE — atira que nem maluco (dá pra CARREGAR segurando o Z)
 # =====================================================================
-U_CARGA_MAX, U_TIROS, U_INTERVALO = 300, 20, 5
+U_CARGA_MAX, U_TIROS, U_INTERVALO = 180, 20, 5  # (carga máxima em 3 segundos: pedido do Gomes, era 5)
 U_CANSADO, U_CANSADO_FORTE = 300, 420  # 5 e 7 segundos sem agir
 
 
@@ -189,7 +189,7 @@ def ultimate(l, outro, jogo):
     m = l.memo
     e = getattr(l, "entrada_atual", None)
     segurando = bool(e and getattr(e, "segura_ult", False))
-    if "atirando" not in m:  # carregando enquanto segura o Z (até 5 segundos)
+    if "atirando" not in m:  # carregando enquanto segura o Z (até 3 segundos)
         m["carga"] = t
         l.vx = 0
         l.fisica(jogo)
@@ -260,7 +260,7 @@ GOLPES["cannan_coronhada"]["total"] = 40
 GOLPES["cannan_upper"] = dict(GOLPES["cannan_coronhada"], dano=15, lanca=16, emp=2)
 _registra("cannan_canhao", ini=R_INI, ativo=R_TIROS * R_INTERVALO, rec=14,
           janelas=tuple((R_INI + k * R_INTERVALO, R_INI + k * R_INTERVALO + 3) for k in range(R_TIROS)),
-          caixa=(20, 40, 96, 120), dano=2, hit=10, defe=7, emp=1, nivel="medio", logica=canhao_perto, ia="medio",
+          caixa=(18, 34, 116, 126), dano=2, hit=10, defe=7, emp=1, nivel="medio", logica=canhao_perto, ia="medio",
           quadros=[(0, "parado"), (R_INI - 2, "c_canhao"), (R_INI + R_TIROS * R_INTERVALO, "c_canhao"),
                    (R_INI + R_TIROS * R_INTERVALO + 14, "parado")])
 GOLPES["cannan_explosao"] = GOLPES["cannan_canhao"]
@@ -288,21 +288,23 @@ PALETA = {
     "p": (226, 178, 140), "P": (196, 146, 110), "q": (150, 104, 76), "s": (170, 80, 70),
     "h": (92, 60, 36), "H": (130, 90, 56), "c": (140, 150, 160), "C": (190, 200, 210), "m": (80, 88, 98),
     "g": (130, 220, 255), "b": (40, 32, 26), "e": (20, 20, 20),
+    # remodel do Gomes: o CINTO DE MUNIÇÃO cruzado no peito (balas douradas)
+    "y": (214, 172, 64), "Y": (250, 222, 130),
 }
 S_REF = 1.38 / 3
 
 TRONCO = Peca([
     "...kkkkkkkk...",
-    "..kxXXxxxxxk..",
-    ".kxXXxxkxxxxk.",
-    ".kxXxxkpkxxxk.",
-    ".kxXxxkpkxxxk.",
-    ".kxxxxxkxxxxk.",
-    ".kxXXkkkkXXxk.",
-    ".kxXXkxxkXXxk.",
-    ".kxxxkkkkxxxk.",
-    "..kxxxxxxxxk..",
-    "..kxXXkkXXxk..",
+    "..kxXXxxxYyk..",
+    ".kxXXxkxYykxk.",
+    ".kxXxxkYykxxk.",
+    ".kxXxxYykpxxk.",
+    ".kxXxYykxxxxk.",
+    ".kXXYykkkXXxk.",
+    ".kxYykxxkXXxk.",
+    ".kYykkkkkoOkk.",
+    "..ykxxxxkoOok.",
+    "..kxXXkkkook..",
     "..kxXXkkXXxk..",
     "..kxxxxxxxxk..",
     "..kooooooooOk.",
@@ -319,14 +321,14 @@ TRONCO = Peca([
 
 TRONCO_COSTAS = Peca([
     "...kkkkkkkk...",
-    "..kxXXxxxxxk..",
-    ".kxXXxxxxxxxk.",
-    ".kxXxxxxxxxxk.",
-    ".kxXxxxxxxxxk.",
-    ".kxxxxxxxxxxk.",
-    ".kxXXxxxxXXxk.",
-    ".kxXXxxxxXXxk.",
-    ".kxxxxxxxxxxk.",
+    "..kyYxxxxxxk..",
+    ".kxyYxxxxxxxk.",
+    ".kxXyYxxxxxxk.",
+    ".kxXxyYxxxxxk.",
+    ".kxxxxyYxxxxk.",
+    ".kxXXxxyYXXxk.",
+    ".kxXXxxxyYXxk.",
+    ".kxxxxxxxyYxk.",
     "..kxxxxxxxxk..",
     "..kxxxxxxxxk..",
     "..kxxxxxxxxk..",
@@ -451,23 +453,77 @@ MAO = Peca([
     ".kkkk.",
 ], PALETA, a=(2, 0), b=(2, 4), estica=False)
 
+TRONCO_LISO = Peca([
+    "...kkkkkkkk...",
+    "..kxXXxxxxxk..",
+    ".kxXXxxkxxxxk.",
+    ".kxXxxkpkxxxk.",
+    ".kxXxxkpkxxxk.",
+    ".kxxxxxkxxxxk.",
+    ".kxXXkkkkXXxk.",
+    ".kxXXkxxkXXxk.",
+    ".kxxxkkkkxxxk.",
+    "..kxxxxxxxxk..",
+    "..kxXXkkXXxk..",
+    "..kxXXkkXXxk..",
+    "..kxxxxxxxxk..",
+    "..kooooooooOk.",
+    "..kbbbbbbbbbk.",
+    "..koooooooook.",
+    "..kOooooooook.",
+    "..kOooooooook.",
+    "..koooooooook.",
+    "..koooooooook.",
+    "..koooooooook.",
+    "...kooooooook.",
+    "....kkkkkkk...",
+], PALETA, a=(7, 20), b=(7, 1))
+
+TRONCO_COSTAS_LISO = Peca([
+    "...kkkkkkkk...",
+    "..kxXXxxxxxk..",
+    ".kxXXxxxxxxxk.",
+    ".kxXxxxxxxxxk.",
+    ".kxXxxxxxxxxk.",
+    ".kxxxxxxxxxxk.",
+    ".kxXXxxxxXXxk.",
+    ".kxXXxxxxXXxk.",
+    ".kxxxxxxxxxxk.",
+    "..kxxxxxxxxk..",
+    "..kxxxxxxxxk..",
+    "..kxxxxxxxxk..",
+    "..kxxxxxxxxk..",
+    "..kooooooooOk.",
+    "..kbbbbbbbbbk.",
+    "..koooooooook.",
+    "..kOooooooook.",
+    "..kOooooooook.",
+    "..koooooooook.",
+    "..koooooooook.",
+    "..koooooooook.",
+    "...kooooooook.",
+    "....kkkkkkk...",
+], PALETA, a=(7, 20), b=(7, 1))
+
 CANHAO = Peca([
-    "..kkkkk..",
-    ".kmcCcmk.",
-    "kmcCCCcmk",
-    "kmcCCCcmk",
-    "kmcCCCcmk",
-    "kmkkkkkmk",
-    "kmcCCCcmk",
-    "kmcCCCcmk",
-    "kmcCCCcmk",
-    "kmkkkkkmk",
-    "kmcCCCcmk",
-    "kmcCCCcmk",
-    "kmmmmmmmk",
-    "kkggggkkk",
-    ".kkkkkkk.",
-], PALETA, a=(4, 0), b=(4, 13))
+    "..kkkkkkk..",
+    ".kmcCCCcmk.",
+    "kmcCCCCCcmk",
+    "kmcCgggCcmk",
+    "kmcCCCCCcmk",
+    "kmkkkkkkkmk",
+    "kmcCCCCCcmk",
+    "kmcgCCCgcmk",
+    "kmcCCCCCcmk",
+    "kmkkkkkkkmk",
+    "kmcCCCCCcmk",
+    "kmcCgggCcmk",
+    "kmmmmmmmmmk",
+    "kkmkmkmkmkk",
+    "kkgggggggkk",
+    ".kkgggggkk.",
+    "..kkkkkkk..",
+], PALETA, a=(5, 0), b=(5, 15))
 
 
 def _cabelo(l, tela, cb, u, f, esc, branco):
@@ -493,8 +549,59 @@ def _pistola(tela, mao, ang, esc):
     pygame.draw.line(tela, (110, 110, 118), mao, fim, max(1, int(2 * esc)))
 
 
+def _armadura(peca):
+    """A mesma peça, mas com a pele virando armadura (braços da MEGA-CANNON)."""
+    mapa = [linha.translate(str.maketrans({"p": "X", "P": "x", "q": "x", "s": "x"})) for linha in peca.mapa]
+    return Peca(mapa, PALETA, a=(peca.a[0] - 0.5, peca.a[1] - 0.5), b=(peca.b[0] - 0.5, peca.b[1] - 0.5),
+                estica=peca.estica)
+
+
+BRACO_MEGA, ANTEBRACO_MEGA, MAO_MEGA = _armadura(BRACO), _armadura(ANTEBRACO), _armadura(MAO)
+
+
+def mega(l):
+    """A roupa MEGA-CANNON (código): armadura azul lisa, CAPACETE e o canhão de ponta redonda."""
+    return l.f.get("roupa") == "megacannon"
+
+
+def capacete(tela, P, esc, branco):
+    """O CAPACETE da MEGA-CANNON: cúpula azul, faixa clara no meio e o disco redondo na orelha."""
+    import pecas
+    troca_ = pecas.TROCA or {}
+    k = (150, 150, 160) if branco else PALETA["k"]
+    azul = (245, 245, 250) if branco else troca_.get("x", PALETA["x"])
+    claro = (245, 245, 250) if branco else troca_.get("X", PALETA["X"])
+    brilho_ = (245, 245, 250) if branco else troca_.get("C", PALETA["C"])
+    cupula = [P(-0.6, 5.6), P(-0.4, 2.6), P(1.6, 0.4), P(5, -0.6), P(8.4, 0.2), P(10.4, 2.2), P(10.8, 4.6),
+              P(9.6, 4.6), P(8.6, 5.2), P(2.6, 5.4), P(1.6, 8.4), P(-0.2, 8.6)]
+    pygame.draw.polygon(tela, k, cupula)
+    pygame.draw.polygon(tela, azul, [(x * 0.86 + P(5, 4)[0] * 0.14, y * 0.86 + P(5, 4)[1] * 0.14) for x, y in cupula])
+    faixa = [P(3.6, -0.2), P(6.4, -0.4), P(6.6, 4.6), P(3.8, 4.8)]
+    pygame.draw.polygon(tela, claro, faixa)
+    pygame.draw.line(tela, brilho_, P(4.6, 0.2), P(4.8, 3.6), max(1, int(0.8 * esc)))
+    orelha = P(1.4, 6.2)
+    r = max(2, int(2.0 * esc))
+    pygame.draw.circle(tela, k, (round(orelha[0]), round(orelha[1])), r + max(1, int(0.6 * esc)))
+    pygame.draw.circle(tela, claro, (round(orelha[0]), round(orelha[1])), r)
+    pygame.draw.circle(tela, brilho_, (round(orelha[0] - 0.5 * esc), round(orelha[1] - 0.5 * esc)), max(1, r // 2))
+
+
+def ponta_buster(tela, no_canhao, esc, branco):
+    """A ponta REDONDA do canhão da MEGA-CANNON (com o brilho carregando)."""
+    import pecas
+    k = (150, 150, 160) if branco else PALETA["k"]
+    luz = (245, 245, 250) if branco else (pecas.TROCA or {}).get("g", PALETA["g"])
+    x, y = no_canhao(5.5, 15.5)
+    r = max(3, int(4.6 * esc))
+    pygame.draw.circle(tela, k, (round(x), round(y)), r + max(1, int(0.8 * esc)))
+    pygame.draw.circle(tela, (245, 245, 250) if branco else (pecas.TROCA or {}).get("c", PALETA["c"]), (round(x), round(y)), r)
+    pygame.draw.circle(tela, k, (round(x), round(y)), max(2, r - int(1.4 * esc)))
+    pygame.draw.circle(tela, luz, (round(x), round(y)), max(1, r - int(2.2 * esc)))
+
+
 def desenhar_cannan(l, tela, p, branco):
     esc = l.s / S_REF
+    eh_mega = mega(l)
     d = l.lado()
     espelho = d < 0
     perto_v = "branco" if branco else "normal"
@@ -511,21 +618,32 @@ def desenhar_cannan(l, tela, p, branco):
         BOTA.desenhar(tela, e, mais(e, fr, 9), esc, espelho, var)
         COXA.desenhar(tela, q, j, esc, espelho, var)
 
+    BRACO_, ANTEBRACO_, MAO_ = (BRACO_MEGA, ANTEBRACO_MEGA, MAO_MEGA) if eh_mega else (BRACO, ANTEBRACO, MAO)
+
     def braco_pistola(cot, mao, var):
         o, c, m = P("pc"), P(cot), P(mao)
-        ANTEBRACO.desenhar(tela, c, m, esc, espelho, var)
+        ANTEBRACO_.desenhar(tela, c, m, esc, espelho, var)
         dm, _ = eixos(c, m)
-        MAO.desenhar(tela, m, mais(m, dm, 4), esc, espelho, var)
-        BRACO.desenhar(tela, o, c, esc, espelho, var)
+        MAO_.desenhar(tela, m, mais(m, dm, 4), esc, espelho, var)
+        BRACO_.desenhar(tela, o, c, esc, espelho, var)
         arma = l.estado == "ataque" and l.nome_golpe in ("cannan_pistola", "cannan_coronhada", "cannan_ultimate")
         if arma:
             _pistola(tela, mais(m, dm, 3), math.atan2(dm[1], dm[0]), esc)
 
     def braco_canhao(cot, mao, var):
         o, c, m = P("pc"), P(cot), P(mao)
-        BRACO.desenhar(tela, o, c, esc, espelho, var)
+        BRACO_.desenhar(tela, o, c, esc, espelho, var)
         dm, _ = eixos(c, m)
-        CANHAO.desenhar(tela, mais(c, dm, -2), mais(m, dm, 8), esc, espelho, var)
+        no_canhao = CANHAO.desenhar(tela, mais(c, dm, -2), mais(m, dm, 8), esc, espelho, var)
+        if eh_mega:
+            ponta_buster(tela, no_canhao, esc, branco)
+        if not branco and (l.t // 12) % 3 == 0:  # (as luzinhas piscando: o canhão high-tech está ligado)
+            import pecas
+            luz = (pecas.TROCA or {}).get("g", PALETA["g"])
+            for yy in (3.5, 7.5, 11.5):
+                x, y = no_canhao(5.5, yy)
+                pygame.draw.circle(tela, (255, 255, 255), (round(x), round(y)), max(1, int(0.9 * esc)))
+                pygame.draw.circle(tela, luz, (round(x), round(y)), max(2, int(1.6 * esc)), 1)
 
     # braço da frente = canhão; braço de trás = pistola (troca quando está de costas)
     if costas:
@@ -535,16 +653,41 @@ def desenhar_cannan(l, tela, p, branco):
     perna("pf" if costas else "pt", "jf" if costas else "jt", longe_v)
     c, cb = P("pc"), P("cb")
     u, f = cabeca_eixos(c, cb, d)
-    _cabelo(l, tela, cb, u, f, esc, branco)
-    (TRONCO_COSTAS if costas else TRONCO).desenhar(tela, P("qd"), c, esc, espelho, perto_v)
+    if not eh_mega:  # (na MEGA-CANNON o cabelo fica dentro do capacete)
+        _cabelo(l, tela, cb, u, f, esc, branco)
+    tronco = (TRONCO_COSTAS_LISO if costas else TRONCO_LISO) if eh_mega else (TRONCO_COSTAS if costas else TRONCO)
+    tronco.desenhar(tela, P("qd"), c, esc, espelho, perto_v)
     perna("pt" if costas else "pf", "jt" if costas else "jf", perto_v)
     pygame.draw.line(tela, PALETA["k"], c, mais(cb, u, -3 * esc), max(3, int(5 * esc)))
     pygame.draw.line(tela, PALETA["P"] if not branco else (240, 240, 240), c, mais(cb, u, -3 * esc), max(1, int(3 * esc)))
-    (CABECA_COSTAS if costas else CABECA).desenhar(tela, cb, mais(cb, u, 10), esc, espelho, perto_v)
+    na_cabeca = (CABECA_COSTAS if costas else CABECA).desenhar(tela, cb, mais(cb, u, 10), esc, espelho, perto_v)
+    if eh_mega:
+        capacete(tela, na_cabeca, esc, branco)
     if costas:
         braco_pistola("ct", "mt", perto_v)
     else:
         braco_canhao("cf", "mf", perto_v)
+    if not costas and not eh_mega:  # 2 GRANADAS penduradas no cinto (colete tático do remodel)
+        granadas(l, tela, p, esc, branco)
+
+
+def granadas(l, tela, p, esc, branco):
+    import pecas
+    troca = pecas.TROCA or {}
+    k = (150, 150, 160) if branco else PALETA["k"]
+    cor = (245, 245, 250) if branco else troca.get("O", PALETA["O"])
+    escura = (245, 245, 250) if branco else troca.get("o", PALETA["o"])
+    qd, pc = p["qd"], p["pc"]
+    for j, dx in enumerate((5, 10)):
+        u = (qd[0] + dx, qd[1] + (pc[1] - qd[1]) * 0.12 + 2)
+        x, y = l.ponto({"_": u}, "_")
+        r = max(2, int(2.2 * esc))
+        pygame.draw.circle(tela, k, (round(x), round(y)), r + max(1, int(0.7 * esc)))
+        pygame.draw.circle(tela, escura, (round(x), round(y)), r)
+        pygame.draw.circle(tela, cor, (round(x - 0.6 * esc), round(y - 0.6 * esc)), max(1, r // 2))
+        pygame.draw.line(tela, k, (x - r, y), (x + r, y), 1)  # o gomo da granada
+        pino = (x + 0.4 * esc, y - r - 1.2 * esc)
+        pygame.draw.circle(tela, (200, 200, 210), (round(pino[0]), round(pino[1])), max(1, int(0.9 * esc)), 1)
 
 
 def figura_extra(q, P, s, d, cor, escura, cont, branco, t):

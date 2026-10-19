@@ -29,7 +29,7 @@ MAGICO = b"BW1"
 ATRASO = 4                # quadros de atraso dos botões (deixa o jogo liso mesmo com a internet oscilando)
 TEMPO_PROCURA = 25.0      # segundos tentando achar o outro
 TEMPO_QUEDA = 6.0         # segundos sem notícia = o outro caiu
-ESPECIAIS_COD = [None, "E", "Q", "R", "SHIFT", "Z"]
+ESPECIAIS_COD = [None, "E", "Q", "R", "SHIFT", "Z", "Z2"]
 
 
 def novo_codigo():
@@ -54,7 +54,7 @@ def codifica(e):
 
 
 def decodifica(n):
-    e = Entrada(n & 15 or 5, bool(n & 16), bool(n & 32), ESPECIAIS_COD[(n >> 8) & 7] if (n >> 8) & 7 < 6 else None)
+    e = Entrada(n & 15 or 5, bool(n & 16), bool(n & 32), ESPECIAIS_COD[(n >> 8) & 7] if (n >> 8) & 7 < len(ESPECIAIS_COD) else None)
     e.segura_ult = bool(n & 64)
     e.provoca = bool(n & 128)
     e.barra = bool(n & 2048)

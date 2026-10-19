@@ -8,6 +8,7 @@ from config import *  # noqa: F401,F403
 import habilidades as hab
 import save
 import som
+import ult2
 from golpes import GOLPES
 from efeitos import Cenario, Impactos, fonte, mistura_cor, moeda, texto, texto_grande, texto_moedas
 from lutador import Entrada, Lutador
@@ -46,14 +47,24 @@ class Partida:
         self.perfects = 0          # rounds que o jogador venceu sem perder vida
         self.quase = 0             # rounds que venceu com 75% de vida ou mais (sem ser perfect)
         self.premio = None         # moedas ganhas: (itens, nível, multiplicador, total, desafios cumpridos)
-        self.stats = dict(parrys=0, quebras=0, ults=0, tomou_ult=False, provocacoes=0, transicoes=0)  # pros desafios
+        self.stats = dict(parrys=0, quebras=0, ults=0, ults2=0, tomou_ult=False, provocacoes=0, transicoes=0,  # pros desafios
+                          choques=0, objetos=0, golpes=0, por_golpe={})  # (v2.0: estatísticas e missões do dia)
         import cenarios
         self.cena = cenarios.cenario(cenario_nome or ficha2.get("cenario", "TEMPLO"))  # luta na casa do adversário
+        import objetos
+        import clima
+        self.objetos = objetos.criar(self.cena.nome)  # CENÁRIO INTERATIVO (v2.0): a coisa do cenário que reage a golpe
+        import natal
+        self.meia = natal.criar(self)  # NATAL: a meia escondida desse cenário (ou None)
+        self.clima = clima.criar(self.cena.nome)      # CLIMA (v2.0): o cenário muda no meio da luta (do round 2)
         self.impactos = Impactos()
         self.t_total = 0
         self.novo_round()
 
     def novo_round(self):
+        if hasattr(self, "objetos"):
+            self.objetos.resetar()
+            self.clima.resetar()
         self.L = [Lutador(self.fichas[0], 330, 1), Lutador(self.fichas[1], 630, -1)]
         if self.trio:  # TRIO: os 3 de cada lado (só um de cada luta por vez)
             self.equipes = [[Lutador(f, 330 if i == 0 else 630, 1 if i == 0 else -1) for f in self.trio[i]]
@@ -85,11 +96,14 @@ class Partida:
         self.quem_ultimate = None
         self.clarao = 0        # tela branca (K.O.)
         self.cutscene = None   # cena de anime de algum ultimate (a luta para enquanto passa)
+        self.cena_loja = None  # CUTSCENE DA LOJA (entrada/vitória cara do jogador)
         self.camera = [1.0, LARGURA / 2, ALTURA / 2]  # zoom e centro (cutscene)
         self.camera_alvo = None                        # um golpe pede zoom: (zoom, x, y)
         self.cinema = 0.0                              # faixas pretas de cinema (0 a 1)
         self.quebra_txt = None  # (lado, quadros) "GUARDA QUEBRADA!"
         self.parry_txt = None   # (lado, quadros) "PARRY!"
+        self.choque = None      # CHOQUE (v2.0): os dois apertando botão rápido
+        self.choque_txt = None  # (texto, quem venceu ou None, quadros)
 
     # ------------------------------------------------------------ efeitos
     def tremer(self, n):
@@ -109,6 +123,18 @@ class Partida:
 
     # ------------------------------------------------------------ um quadro
     def passo(self, bruto):
+        self._passo(bruto)
+        if not hasattr(self, "narrador"):
+            import narrador
+            self.narrador = narrador.Narrador()  # NARRADOR: frases grandes nos momentos épicos (só lê a luta)
+        self.narrador.passo(self)
+
+    def _passo(self, bruto):
+        if getattr(self, "cena_loja", None):  # CUTSCENE DA LOJA (vitória/entrada cara): tudo para enquanto passa
+            self.cena_loja.passo()
+            if self.cena_loja.acabou:
+                self.cena_loja = None
+            return
         """bruto = (teclado, mouse) do pygame, ou None nos testes."""
         self.tf += 1
         self.t_total += 1
@@ -120,6 +146,9 @@ class Partida:
             self.camera[i] += (alvo[i] - self.camera[i]) * 0.14
         self.cinema += ((1.0 if self.camera_alvo else 0.0) - self.cinema) * 0.15
         self.camera_alvo = None
+        if self.fase == "ko" and self.tf < 75 and getattr(self, "ko_quem", None) is not None:
+            l = self.L[self.ko_quem]  # K.O.: zoom em quem caiu (junto com a câmera lenta)
+            self.camera_alvo = (1.35, l.x, l.y - 60 * l.s)
         self.impactos.update()
         if self.clarao > 0:
             self.clarao -= 1
@@ -140,12 +169,21 @@ class Partida:
         if self.quebra_txt:
             lado, q = self.quebra_txt
             self.quebra_txt = (lado, q - 1) if q > 1 else None
+        if self.choque_txt:
+            txt, quem, q = self.choque_txt
+            self.choque_txt = (txt, quem, q - 1) if q > 1 else None
         if self.parry_txt:
             lado, q = self.parry_txt
             self.parry_txt = (lado, q - 1) if q > 1 else None
 
         if self.fase == "entrada":
             self.passo_entrada()
+            return
+        if self.fase == "falas":
+            self.passo_falas()
+            return
+        if self.fase == "finish":
+            self.passo_finish()
             return
         for l in self.L:  # (segurança) entrada acabou: nada dela fica na tela
             if l.entrada_t is not None:
@@ -168,6 +206,12 @@ class Partida:
         if self.escuro > 0:
             self.escuro -= 1
             return
+        if self.choque:  # CHOQUE: tudo congelado, os dois apertando botão
+            ents = [self.ctrl[i].ler(bruto, self.L[i], self.L[1 - i], self) for i in (0, 1)]
+            self.choque.passo(ents)
+            if self.choque.acabou:
+                self.choque = None
+            return
         if self.parada > 0:
             self.parada -= 1
             return
@@ -181,14 +225,21 @@ class Partida:
             self.L[i].update(ents[i], self.L[1 - i], self)
             if self.L[i].pediu_ultimate:  # momento épico: tudo para e a tela escurece
                 self.L[i].pediu_ultimate = False
-                self.escuro, self.quem_ultimate = ULTIMATE_PAUSA, self.L[i]
+                ult2_ = bool(self.L[i].golpe and self.L[i].golpe.get("ultimate2"))
+                self.escuro, self.quem_ultimate = (ULT2_PAUSA if ult2_ else ULTIMATE_PAUSA), self.L[i]
+                self.escuro_max = self.escuro
         if self.trio and self.fase == "luta":
             self.passo_trio(ents)
         self.ex_tiros()
         self.empurrar()
+        if self.tentar_choque():
+            return
         for i in (0, 1):
             self.checar_golpe(self.L[i], self.L[1 - i])
         self.checar_projeteis()
+        if getattr(self, "meia", None) and self.meia.cenario == self.cena.nome:
+            self.meia.passo(self)  # NATAL: golpe do jogador pega a meia
+        self.passo_objetos()
         self.combo_max = max(self.combo_max, self.L[0].combo)
         self.sentir()
 
@@ -201,6 +252,8 @@ class Partida:
             if any(self.perdeu(i) for i in (0, 1)):
                 self.fase, self.tf = "ko", 0
                 self.msg = "K.O.!"
+                self.ko_quem = next(i for i in (0, 1) if self.perdeu(i))
+                self.preparar_finish()
                 som.tocar("ko")
                 self.tremer(16)
                 self.clarao = 8
@@ -210,12 +263,39 @@ class Partida:
         elif self.fase == "ko":
             for i, (l, o) in enumerate(((self.L[0], self.L[1]), (self.L[1], self.L[0]))):
                 if self.vida_lado(i) > self.vida_lado(1 - i) and l.estado == "parado" and self.tf > 90:
+                    if getattr(self, "finish_pendente", False):  # a luta acabou com ULTIMATE: FINISH!
+                        self.comecar_finish(l, o)
+                        return
                     l.mudar("vitoria")
+                    self.cena_da_loja(i, "vitoria")
             if self.tf > 240:
                 self.terminar_round()
 
+    def cena_da_loja(self, i, tipo):
+        """CUTSCENE da loja: só do JOGADOR (gente, fora do online), só uma vez, e a vitória só na que FECHA a luta."""
+        import cenas_loja
+        l = self.L[i]
+        if getattr(self, "lado_humano", None) is not None or getattr(self, "assistindo", False) or self.treino:
+            return
+        if i not in self.lados_humanos() or (tipo, i) in getattr(self, "cenas_vistas", set()):
+            return
+        if tipo == "vitoria" and self.vitorias[i] + 1 < self.rounds:
+            return
+        cena = cenas_loja.criar(l.f, tipo, self.L[1 - i].f, self.cena.nome)
+        if cena:
+            self.cenas_vistas = getattr(self, "cenas_vistas", set()) | {(tipo, i)}
+            self.cena_loja = cena
+            if tipo == "entrada":
+                l.extra["entrada_cena"] = True  # (na arena ele já aparece pronto, no lugar)
+
     def passo_entrada(self):
         """As entradas dos personagens (Max chega voando, Rib faz Kawarimi, Trafo sai da terra...)."""
+        if not getattr(self, "_cena_entrada_vista", False):  # (no 1º quadro da entrada: a CUTSCENE da loja, se tiver)
+            self._cena_entrada_vista = True
+            for i in (0, 1):
+                self.cena_da_loja(i, "entrada")
+            if self.cena_loja:
+                return
         if self.tf >= DURACAO_ENTRADA:
             for l in self.L:
                 l.entrada_t = None
@@ -226,15 +306,137 @@ class Partida:
                 l.x, l.y = l.extra.get("entrada_x", l.x), CHAO
                 l.mudar("parado")
             self.fase, self.tf = "intro", 0
+            self.comecar_falas()
             return
         for l in self.L:
             l.entrada_t = self.tf
             entrada = l.f.get("entrada")
-            if entrada:
+            if l.extra.get("entrada_cena"):  # (já viu a cutscene: fica parado no lugar)
+                l.x, l.y = l.extra.get("entrada_x", l.x), CHAO
+                l.esconde, l.sobrepor = False, {}
+                l.t += 1
+            elif entrada:
                 entrada(l, self.tf, self)
             else:
                 l.t += 1
             l.animar()
+
+    # ---- FINISH (v2.0): a luta acabou com ULTIMATE -> cena de finalização do vencedor ----
+    def preparar_finish(self):
+        import finish
+        self.finish_pendente = False
+        if self.treino or self.trio:
+            return
+        perdedor = self.L[self.ko_quem]
+        venc = 1 - self.ko_quem
+        ultima = self.vitorias[venc] + 1 >= self.rounds  # (só no K.O. que acaba a luta)
+        self.finish_pendente = ultima and getattr(perdedor, "ult_recente", 0) > 0 and finish.de(self.L[venc]) is not None
+
+    def comecar_finish(self, v, d):
+        import finish
+        self.finish_pendente = False
+        self.finish = (v, d, finish.de(v))
+        self.finish_ini = self.t_total
+        self.fase, self.tf = "finish", 0
+        v.mudar("parado")
+        v.sobrepor = {}
+        d.mudar("caido")  # (o derrotado fica deitado no chão durante a cena)
+        d.sobrepor, d.vx, d.vy, d.y, d.angulo = {}, 0, 0, CHAO, 0
+        d.pose_vista = None
+        som.tocar("ultimate")
+        self.tremer(10)
+
+    def passo_finish(self):
+        import finish
+        v, d, fn = self.finish
+        fn["passo"](v, d, self.tf, self)
+        v.x = max(PAREDE_E, min(PAREDE_D, v.x))  # (sentar/pular em cima de quem caiu na parede: não sai da tela)
+        for l in (v, d):
+            l.t += 1
+            l.animar()
+        self.camera_alvo = (1.25, (v.x + d.x) / 2, CHAO - 90)
+        if self.tf >= finish.DURACAO:  # acabou: agora sim a pose de vitória
+            v.sobrepor = {}
+            v.y = CHAO
+            v.mudar("vitoria")
+            self.fase, self.tf = "ko", 200
+            self.cena_da_loja(self.L.index(v), "vitoria")
+
+    def desenhar_finish(self, tela):
+        import finish
+        if not getattr(self, "finish", None):
+            return
+        v, d, fn = self.finish
+        t = self.t_total - self.finish_ini
+        fn["desenhar"](v, d, tela, t)
+        if self.fase == "finish":
+            if t < finish.TEXTO + 50:
+                esc = 1 + max(0, (14 - t) / 14) * 1.2
+                texto_grande(tela, "FINISH!", 64, (255, 70, 60), (LARGURA // 2, 130), esc, contorno=(40, 0, 0))
+            if 30 < t < finish.DURACAO:
+                texto_grande(tela, fn["nome"], 30, (255, 230, 120), (LARGURA // 2, 186), contorno=(40, 20, 0))
+
+    # ---- FALAS NA ENTRADA (v2.0): cada um chega, fica na pose de espera, fala e vai pra pose de luta ----
+    FALA_INICIO, FALA_INTERVALO, FALA_DEPOIS = 12, 10, 24
+
+    def comecar_falas(self):
+        """Sorteia a conversa e põe os dois na pose de espera. (O sorteio usa o random da luta: no ONLINE
+        os dois PCs sorteiam a mesma conversa, e o tempo de cada fala sai igual.)"""
+        import falas
+        if getattr(self, "sem_falas", False):
+            return
+        self.falas_luta = falas.dialogo(self.L[0].f, self.L[1].f)
+        if not self.falas_luta:
+            return
+        for l in self.L:
+            l.pose_espera = l.f.get("espera", "vitoria")
+        self.fase, self.tf = "falas", 0
+
+    def tempos_falas(self):
+        """[(lado, texto, começa, termina)] de cada fala, em quadros."""
+        t = self.FALA_INICIO
+        tempos = []
+        for lado, txt in self.falas_luta:
+            dur = min(170, 46 + len(txt) * 2)
+            tempos.append((lado, txt, t, t + dur))
+            t += dur + self.FALA_INTERVALO
+        return tempos
+
+    def passo_falas(self):
+        tempos = self.tempos_falas()
+        for lado, _, _, fim in tempos:
+            if self.tf == fim:  # falou: agora fica na pose de luta
+                self.L[lado].pose_espera = None
+        for l in self.L:
+            l.t += 1
+            l.animar()
+        if self.tf >= tempos[-1][3] + self.FALA_DEPOIS:
+            self.terminar_falas()
+
+    def terminar_falas(self):
+        for l in self.L:
+            l.pose_espera = None
+            l.t = 0
+        self.fase, self.tf = "intro", 0
+
+    def pular_entrada(self):
+        """ENTER: pula a entrada e as falas (vai direto pro ROUND 1). A CUTSCENE DA LOJA não pula (o Gomes pediu)."""
+        if getattr(self, "cena_loja", None):
+            return
+        if self.fase == "entrada":
+            self.tf = DURACAO_ENTRADA
+            self.sem_falas = True
+            self.passo_entrada()
+        elif self.fase == "falas":
+            self.terminar_falas()
+
+    def desenhar_falas(self, tela):
+        from selecao import balao
+        for lado, txt, comeca, termina in self.tempos_falas():
+            if comeca <= self.tf < termina + 4:
+                l = self.L[lado]
+                topo = l.y - (l.f.get("altura", 1.0) * 120 + 18) * l.s
+                balao(tela, txt, lado, (self.tf - comeca) * 2, alvo=(l.x, topo))
 
     def passo_treino(self):
         """Treino: ninguém morre; quando o combo acaba, a vida volta e guarda o resultado."""
@@ -259,6 +461,7 @@ class Partida:
         a, b = self.vida_lado(0), self.vida_lado(1)
         eu = self.L[0]
         self.stats["ults"] += eu.acertou_ult
+        self.stats["ults2"] += eu.acertou_ult2
         self.stats["tomou_ult"] |= eu.tomou_ult
         self.stats["provocacoes"] += eu.provocou
         if a > b and a >= self.vida_comeco:
@@ -274,6 +477,19 @@ class Partida:
             self.vencedor = "empate" if v1 and v2 else (0 if v1 else 1)
             self.fase, self.tf = "fim", 0
             self.pagar()
+            self.dar_maestria()
+            import estatisticas
+            import missoes
+            import perfil
+            estatisticas.registrar(self)
+            import rivais
+            rivais.registrar(self)
+            self.missoes_feitas = missoes.avancar(self)     # MISSÕES DO DIA cumpridas nessa luta
+            self.trofeus_ganhos = perfil.trofeus_novos()    # TROFÉUS que saíram agora
+            import eventos
+            self.doces_ganhos = eventos.ganhar_doces(self)  # HALLOWEEN: +3 ganhando, +1 perdendo
+            import figurinhas
+            self.figurinha_ganha = figurinhas.sortear_da_luta(self)  # ÁLBUM: às vezes sai uma figurinha
         else:
             self.round += 1
             self.novo_round()
@@ -287,7 +503,8 @@ class Partida:
     def sentir(self):
         """VIBRAÇÃO: quem perdeu vida sente o controle tremer (mais forte quanto maior o dano)."""
         import controle_video
-        cs = self.controles()
+        import save
+        cs = self.controles() if save.d().get("vibrar", True) else [None, None]  # (CONFIGURAÇÕES: vibração)
         antes = getattr(self, "_vidas", None)
         self._vidas = [l.vida for l in self.L]
         if not antes or not any(cs):
@@ -426,7 +643,10 @@ class Partida:
                 texto(tela, txt, 12, (150, 220, 255), (34 + 60 if i == 0 else LARGURA - 34 - 60, 142))
 
     def registrar_hit(self, atacante, nome, ativacao):
-        """Desafios de combo: o jogador acertou o boneco com esse golpe."""
+        """O jogador (lado 0) acertou alguém com esse golpe (desafios de combo, estatísticas e missões)."""
+        if atacante is self.L[0] and nome:
+            self.stats["golpes"] += 1
+            self.stats["por_golpe"][nome] = self.stats["por_golpe"].get(nome, 0) + 1
         if getattr(self, "combos", None) and atacante is self.L[0]:
             self.combos.acertou(nome, ativacao, atacante.combo)
 
@@ -453,9 +673,104 @@ class Partida:
         """O que aconteceu na partida (pros desafios)."""
         venceu = self.vencedor == 0
         n = self.sobrevivencia
-        return dict(self.stats, venceu=venceu, personagem=self.fichas[0].get("nome_base", self.fichas[0]["nome"]),
-                    nivel=self.ctrl[1].nivel, combo=self.combo_max, bom=venceu and (self.perfects + self.quase) > 0,
-                    sobrev=(n + venceu) if n is not None else 0)
+        f0 = self.L[0].f if self.trio else self.fichas[0]
+        return dict(self.stats, venceu=venceu, personagem=f0.get("nome_base", f0["nome"]),
+                    nivel=getattr(self.ctrl[1], "nivel", None), combo=self.combo_max,
+                    bom=venceu and (self.perfects + self.quase) > 0, sobrev=(n + venceu) if n is not None else 0,
+                    perfects=self.perfects, pulos=getattr(self.L[0], "pulos", 0) if not self.trio else
+                    sum(getattr(m, "pulos", 0) for m in self.equipes[0]),
+                    rounds=self.round, vida=self.vida_lado(0), adversario=self.L[1].f.get("nome_base", self.L[1].f["nome"]),
+                    cenario=self.cena.nome, regras=sorted(self.regras),
+                    modo=("trio" if self.trio else "torneio" if getattr(self, "torneio", False) else
+                          "sobrevivencia" if self.sobrevivencia is not None else
+                          "online" if getattr(self, "online", False) else "luta"))
+
+    def enfeites_evento(self):
+        """Os enfeites do evento de hoje (pela data do PC), ou None. Só desenho."""
+        if not hasattr(self, "_enfeites"):
+            import eventos
+            self._enfeites = eventos.criar()
+        return self._enfeites
+
+    def periodo_atual(self):
+        """DIA / PÔR DO SOL / NOITE do cenário (sorteado uma vez por cenário; no online, igual nos dois PCs)."""
+        import periodo
+        if getattr(self, "_periodo_de", None) != self.cena.nome:
+            self._periodo_de = self.cena.nome
+            base = getattr(self, "semente", None)
+            if base is None:
+                base = getattr(self, "_periodo_sorte", None) or random.Random().randrange(1, 10 ** 6)
+                self._periodo_sorte = base
+            rng = random.Random(base * 31 + sum(ord(c) for c in self.cena.nome))  # (nunca mexe no random da luta)
+            self.periodo = periodo.criar(self.cena.nome, rng)
+        return self.periodo
+
+    def lados_humanos(self):
+        """Quem é gente de verdade nessa luta (o ONLINE diz qual lado é o deste PC)."""
+        from controles import Jogador
+        if getattr(self, "lado_humano", None) is not None:
+            return [self.lado_humano]
+        return [i for i in (0, 1) if isinstance(self.ctrl[i], Jogador)]
+
+    def dar_maestria(self):
+        """MAESTRIA (v2.0): quem jogou ganha pontos com o lutador que usou (no TRIO, os 3)."""
+        import maestria
+        self.maestria_info = []
+        if self.treino or getattr(self, "assistindo", False):
+            return
+        for i in self.lados_humanos():
+            pts = maestria.pontos_da_luta(self, i)
+            if pts <= 0:
+                continue
+            fichas = [m.f for m in self.equipes[i]] if self.trio else [self.L[i].f]
+            for f in fichas:
+                antes, depois = maestria.ganhar(f, pts)
+                premio = maestria.premio_do_nivel(depois) if depois > antes else ""
+                self.maestria_info.append((i, f, pts, depois, premio))
+
+    def desenhar_conquistas(self, tela):
+        """No fim da luta: MISSÃO CUMPRIDA e TROFÉU NOVO (em cima, embaixo das barras de vida)."""
+        linhas = [(f"MISSÃO CUMPRIDA! {txt}", f"+{m} moedas  +{xp} maestria", (150, 230, 255))
+                  for txt, m, xp in getattr(self, "missoes_feitas", None) or []]
+        linhas += [(f"TROFÉU: {nome}!", "", (255, 220, 90)) for nome in getattr(self, "trofeus_ganhos", None) or []]
+        if not linhas:
+            return
+        k = min(1.0, self.tf / 20)
+        r = pygame.Rect(LARGURA // 2 - 300, 96 - int((1 - k) * 60), 600, 12 + 26 * len(linhas))
+        caixa = pygame.Surface(r.size, pygame.SRCALPHA)
+        caixa.fill((14, 10, 26, 220))
+        tela.blit(caixa, r.topleft)
+        pygame.draw.rect(tela, (255, 210, 90), r, 2, border_radius=8)
+        for i, (txt, extra, cor) in enumerate(linhas):
+            y = r.y + 19 + i * 26
+            texto(tela, txt, 15, cor, (r.centerx - (60 if extra else 0), y))
+            if extra:
+                texto(tela, extra, 13, (255, 220, 90), (r.right - 90, y))
+
+    def desenhar_maestria(self, tela):
+        """No fim da luta: a barrinha de maestria de cada lutador (e o prêmio, se subiu de nível)."""
+        import maestria
+        if self.premio:  # logo embaixo da caixa das moedas
+            itens, _, _, _, cumpridos = self.premio
+            y = 302 + 20 + (max(1, len(itens)) + len(cumpridos) + 2) * 21 + 30
+        else:
+            y = 330
+        y = min(y, ALTURA - 24 - 34 * (len(self.maestria_info) - 1))  # (TRIO: 3 barrinhas, tem que caber)
+        for lado, f, pts, nivel, premio in self.maestria_info:
+            n, xp, prox = maestria.progresso(f)
+            nome = f.get("nome_base", f["nome"])
+            x = LARGURA // 2
+            k = min(1.0, self.tf / 50)
+            if premio and (self.tf // 10) % 2:
+                texto(tela, f"{nome} SUBIU PRO NÍVEL {n}!  ganhou: {premio}", 16, (255, 230, 90), (x, y - 14))
+            else:
+                texto(tela, f"MAESTRIA {nome}: NÍVEL {n}   +{round(pts * k)}", 14, (220, 220, 235), (x, y - 14))
+            r = pygame.Rect(x - 150, y, 300, 10)
+            pygame.draw.rect(tela, (14, 10, 26), r.inflate(4, 4), border_radius=4)
+            cheio = 1.0 if not prox else xp / prox
+            cor = maestria.moldura(f) or (120, 200, 255)
+            pygame.draw.rect(tela, cor, (r.x, r.y, int(r.w * cheio), r.h), border_radius=4)
+            y += 34
 
     def pagar(self):
         """Moedas! Só quando é você contra o computador (no treino e no CPU x CPU não vale)."""
@@ -483,6 +798,10 @@ class Partida:
             itens.append(("RECORDE NOVO", MOEDAS_RECORDE))
         nivel = self.ctrl[1].nivel
         mult = MOEDAS_MULT.get(nivel, 1)
+        import rivais
+        if venceu and rivais.sao_rivais(self.fichas[0], self.fichas[1]):  # RIVAL DERROTADO: moedas em dobro
+            mult *= rivais.MULT_MOEDAS
+            nivel = f"{nivel} + RIVAL DERROTADO"
         total = round(sum(v for _, v in itens) * mult)
         import desafios
         cumpridos = desafios.atualizar(self.resumo())  # desafios valem sem multiplicador
@@ -493,6 +812,10 @@ class Partida:
         a, b = self.L
         if "agarrado" in (a.estado, b.estado) or a.y < 0 or b.y < 0:
             return
+        if "rolando" in (a.estado, b.estado):
+            return  # ROLAMENTO: passa pelo outro
+        if any(l.extra.get("nadando") or (l.estado == "ataque" and l.memo.get("so_barbatana")) for l in (a, b)):
+            return  # SPHYRUS embaixo da terra (nadando/mergulho): passa por baixo do outro
         if abs(a.y - b.y) > 90:
             return  # um tá pulando por cima do outro
         minimo = CORPO * a.s + CORPO * b.s
@@ -508,6 +831,31 @@ class Partida:
                 l.x = max(PAREDE_E, min(PAREDE_D, l.x))
                 o.x = l.x - s * minimo
 
+    def passo_objetos(self):
+        import clima
+        import objetos
+        if getattr(self, "combos", None):
+            return  # (nos desafios de combo o objeto atrapalhava)
+        if not self.treino or objetos.LIGADO_NO_TREINO:
+            self.objetos.passo(self)
+        if not self.treino or clima.LIGADO_NO_TREINO:
+            self.clima.passo(self)
+
+    def tentar_choque(self):
+        """Os dois acertaram golpe forte no mesmo quadro? CHOQUE!"""
+        import choque
+        if self.fase != "luta" or self.choque or self.treino:
+            return False
+        a, b = self.L
+        ca, cb = a.corpo(), b.corpo()
+        if not (ca and cb and choque.forte(a) and choque.forte(b)):
+            return False
+        pa, pb = a.contato(cb), b.contato(ca)
+        if not (pa and pb):
+            return False
+        self.choque = choque.Choque(self, ((pa[0] + pb[0]) / 2, (pa[1] + pb[1]) / 2))
+        return True
+
     def checar_golpe(self, a, b):
         cb = b.corpo()
         ponto = a.contato(cb) if cb else None
@@ -520,6 +868,8 @@ class Partida:
             g = dict(g, dano=g["dano"] * EX_DANO)
         sinal = 1 if b.x > a.x else -1
         res = b.receber(g, sinal, a, a.f["forca"])
+        if res == "esquiva":  # (substituição: não aconteceu nada)
+            return
         if res == "hit" and b is self.L[1]:
             self.golpes_treino += 1
             self.registrar_hit(a, a.nome_golpe, getattr(a, "golpe_id", 0))
@@ -588,6 +938,13 @@ class Partida:
                 bum = p.golpe.get("bumerangue") or q.golpe.get("bumerangue")  # o nunchaku não some no choque
                 if p.vivo and q.vivo and p.dono is not q.dono and not bum and p.rect().colliderect(q.rect()):
                     fica_p, fica_q = p.golpe.get("atravessa"), q.golpe.get("atravessa")  # o Mini Sol passa por cima
+                    if (self.fase == "luta" and not self.treino and not self.choque and not (fica_p or fica_q)
+                            and p.golpe.get("especial") and q.golpe.get("especial")):
+                        import choque  # CHOQUE DE TIROS: cabo de guerra de poder no meio da tela!
+                        do0 = p if p.dono is self.L[0] else q
+                        self.choque = choque.Choque(self, ((p.x + q.x) / 2, (p.y + q.y) / 2),
+                                                    tiros=(do0, q if do0 is p else p))
+                        return
                     p.vivo = bool(fica_p) and not fica_q
                     q.vivo = bool(fica_q) and not fica_p
                     self.faisca((p.x + q.x) / 2, p.y, False)
@@ -603,6 +960,9 @@ class Partida:
                     p.vivo = False
                 self.ultimo_hit = self.tf
                 res = alvo.receber(p.golpe, 1 if p.vx > 0 else -1, p.dono, p.dono.f["forca"])
+                if res == "esquiva":  # (substituição: o projétil pegou no tronco e some)
+                    p.vivo = False
+                    continue
                 if res == "hit" and alvo is self.L[1]:
                     self.golpes_treino += 1
                     self.registrar_hit(p.dono, getattr(p, "nome_golpe", None), ("proj", getattr(p, "ativacao", 0)))
@@ -616,21 +976,87 @@ class Partida:
                     continue
                 self.som_do_golpe(res, p.golpe)
                 self.faisca(p.x, p.y, res == "def", p.golpe["dano"] >= 10)
-                self.parada = PARADA_GOLPE if res == "hit" else 4
+                if not p.golpe.get("sem_parada"):  # (rajada de minigun/mísseis: não congela a cada tiro)
+                    self.parada = PARADA_GOLPE if res == "hit" else 4
                 if res == "hit":
-                    self.tremer(16 if p.golpe is GOLPES["ultimate"] else 8)
+                    self.tremer(16 if p.golpe is GOLPES["ultimate"] else 3 if p.golpe.get("sem_parada") else 8)
         self.projeteis = [p for p in ps if p.vivo]
 
     # ------------------------------------------------------------ desenho
     def desenhar(self, tela):
+        if getattr(self, "cena_loja", None):
+            self.cena_loja.desenhar(tela)
+            return
         if self.cutscene:
             self.cutscene.desenhar(tela)
             return
+        if self.desenhar_replay(tela):
+            return
         self.desenhar_luta(tela)
+        self.gravar_replay(tela)
+        self.desenhar_finish(tela)
+        self.desenhar_brilho_mestre(tela)
+        if self.choque:
+            self.choque.desenhar(tela)
+        q = self.quem_ultimate
+        if self.escuro and q is not None and q.golpe and q.golpe.get("ultimate2"):  # 2ª ULTIMATE: a apresentação
+            ult2.desenhar_cartao(tela, q, self, 1 - self.escuro / getattr(self, "escuro_max", ULT2_PAUSA))
         if self.treino and getattr(self, "ver_caixas", False):
             self.desenhar_caixas(tela)
         if getattr(self, "assistindo", False) and self.fase not in ("fim",):
             texto(tela, "TORNEIO: assistindo   (ENTER pula pro resultado)", 14, (220, 220, 235), (LARGURA // 2, ALTURA - 12))
+
+    # ---- REPLAY (v2.0): os últimos 2 segundos antes do K.O. final, em câmera lenta ----
+    REPLAY_QUADROS = 66   # guardados (um a cada 2 desenhos: ~2 segundos)
+    REPLAY_LENTO = 3      # cada quadro do replay fica 3 desenhos na tela
+
+    def gravar_replay(self, tela):
+        """Só desenho: guarda uma foto pequena da tela (não mexe em nada da luta)."""
+        if self.treino or getattr(self, "assistindo", False):
+            return
+        if not (self.fase == "luta" or (self.fase == "ko" and self.tf < 45)):
+            return
+        if not hasattr(self, "replay"):
+            import collections
+            self.replay = collections.deque(maxlen=self.REPLAY_QUADROS)
+            self._rq = 0
+        self._rq += 1
+        if self._rq % 2 == 0:
+            self.replay.append(pygame.transform.scale(tela, (LARGURA // 3, ALTURA // 3)))  # (pequena: pouca memória)
+
+    def replay_tocando(self):
+        return (self.fase == "fim" and self.msg == "K.O.!" and len(getattr(self, "replay", ())) > 20
+                and not getattr(self, "replay_visto", False))
+
+    def pular_replay(self):
+        self.replay_visto = True
+
+    def desenhar_replay(self, tela):
+        if not self.replay_tocando():
+            return False
+        self.replay_i = getattr(self, "replay_i", 0) + 1
+        k = self.replay_i // self.REPLAY_LENTO
+        if k >= len(self.replay):
+            self.replay_visto = True
+            return False
+        tela.blit(pygame.transform.scale(self.replay[k], (LARGURA, ALTURA)), (0, 0))
+        faixa = pygame.Surface((LARGURA, 44), pygame.SRCALPHA)  # (só embaixo: em cima ficam as barras de vida)
+        faixa.fill((0, 0, 0, 160))
+        tela.blit(faixa, (0, ALTURA - 44))
+        if (self.replay_i // 15) % 2:
+            pygame.draw.circle(tela, (230, 40, 40), (30, ALTURA - 22), 9)
+        texto_grande(tela, "REPLAY", 26, BRANCO, (96, ALTURA - 22), contorno=(40, 0, 0))
+        texto(tela, "câmera lenta", 14, (220, 220, 235), (LARGURA // 2, ALTURA - 22))
+        texto(tela, "ENTER pula", 13, (220, 220, 230), (LARGURA - 60, ALTURA - 22))
+        return True
+
+    def desenhar_brilho_mestre(self, tela):
+        """MAESTRIA nível 10: quem joga com o lutador ganha um brilho dourado na pose de vitória."""
+        import maestria
+        for i in self.lados_humanos():
+            l = self.L[i]
+            if l.estado == "vitoria" and maestria.brilho_na_vitoria(l.f):
+                maestria.desenhar_brilho_vitoria(tela, l.x, CHAO, self.t_total, l.s / l.f["tam"])
 
     def pular_pro_fim(self):
         """Assistindo os computadores: roda o resto da luta sem desenhar e arruma a tela do resultado
@@ -679,6 +1105,8 @@ class Partida:
             self.escurecer = pygame.Surface((lw, lh), pygame.SRCALPHA)
         camada = self.camada
         baixo = self.cena.desenhar_pequeno(self.t_total, PIXEL)
+        per = self.periodo_atual()
+        per.pintar_fundo(baixo, self.t_total)  # DIA E NOITE (só desenho)
         camada.fill((0, 0, 0, 0))
 
         tela_toda = pygame.Rect(0, 0, LARGURA, ALTURA)
@@ -687,7 +1115,7 @@ class Partida:
             """Pedaço da tela onde esses lutadores (e os golpes deles) estão, pelos pontos do corpo."""
             r = None
             for l in lutadores:
-                if l.feixe or l.y < -200 or l.rastro or (l.estado == "ataque" and l.memo.get("tela_toda")) \
+                if l.feixe or l.extra.get("tronco") or l.extra.get("tela_toda") or l.y < -200 or l.rastro or (l.estado == "ataque" and l.memo.get("tela_toda")) \
                         or l.f.get("tela_toda"):
                     return tela_toda
                 p = l.pose_vista or l.pose_atual()
@@ -721,15 +1149,27 @@ class Partida:
             baixo.blit(peq, pos)
             camada.fill((0, 0, 0, 0), r)
 
+        # os ENFEITES DO EVENTO (Halloween: teias e abóboras) e o objeto do cenário (atrás dos lutadores)
+        en = self.enfeites_evento()
+        if en:
+            en.desenhar_fundo(camada, self.t_total)
+        self.objetos.desenhar(camada)
+        meia = getattr(self, "meia", None)
+        if meia and meia.cenario == self.cena.nome:
+            meia.desenhar(camada)
+        self.clima.desenhar(camada)
+        passa(False, tela_toda if self.clima.ativo or en or meia else self.objetos.area())
         # quem passa por trás vem primeiro; quem está atacando fica na frente
+        import natal
+        gorro = natal.gorro_ligado()
         ordem = sorted(self.L, key=lambda l: (not getattr(l, "atras", False), l.estado == "ataque"))
         for l in ordem:
             if self.escuro and l is self.quem_ultimate:
 
-                k = 1 - self.escuro / ULTIMATE_PAUSA
+                k = 1 - self.escuro / getattr(self, "escuro_max", ULTIMATE_PAUSA)
                 self.escurecer.fill((0, 0, 20, int(190 * min(1, k * 4))))
                 baixo.blit(self.escurecer, (0, 0))
-                cor = l.f["cor_poder"]
+                cor = (255, 200, 60) if l.golpe and l.golpe.get("ultimate2") else l.f["cor_poder"]
                 cx, cy = l.x, l.y - 60 * l.s
                 for i in range(3):  # anéis de energia fechando nele
                     r = int(220 * (1 - k) + 40 + i * 30) % 260 + 30
@@ -739,6 +1179,9 @@ class Partida:
                     r1, r2 = 330 - k * 150, 420
                     pygame.draw.line(camada, (255, 255, 255), (cx + math.cos(a) * r1, cy + math.sin(a) * r1),
                                      (cx + math.cos(a) * r2, cy + math.sin(a) * r2), 3)
+                passa(False, tela_toda)
+            if l.tem_atras():  # trono, sofá, cápsula... vão pro fundo ANTES do corpo
+                l.desenhar_atras(camada)
                 passa(False, tela_toda)
             # cada lutador vira um sprite separado, desenhado direto pequeno, com contorno de 1 pixel
             peq = self.camada_peq
@@ -753,11 +1196,14 @@ class Partida:
                     baixo.blit(silhueta, (r.x + dx, r.y + dy))
                 baixo.blit(pedaco, r.topleft)
                 peq.fill((0, 0, 0, 0), r)
+            if gorro and not l.esconde:  # NATAL: o GORRINHO (se ele ligou nas configurações)
+                natal.desenhar_gorro(l, camada)
+                passa(False, area([l]))
             if self.fase == "entrada" or l.estado == "vitoria":
                 passa(False, tela_toda)
             elif (l.estado == "ataque" and l.golpe and l.golpe.get("efeito")) or l.estado == "tonto"                     or l.efeito_habilidade():
                 passa(False, tela_toda if l.feixe or l.y < -200 or l.estado == "ataque" or l.extra.get("pocas")
-                      else area([l]))
+                      or ult2.vivo(l) else area([l]))
         # efeitos por cima (sem contorno)
         for p in self.projeteis:
             p.desenhar(camada)
@@ -773,6 +1219,7 @@ class Partida:
             passa(False, pygame.Rect(min(xs) - m, min(ys) - m, max(xs) - min(xs) + 2 * m,
                                      max(ys) - min(ys) + 2 * m).clip(tela_toda))
         self.cena.desenhar_frente(baixo, self.t_total, PIXEL)
+        per.pintar_tudo(baixo)  # (os lutadores também ficam no tom do período: ninguém "brilha" no escuro)
 
         ox = oy = 0
         if self.tremor:
@@ -792,6 +1239,10 @@ class Partida:
             tela.blit(self._grande, (ox, oy))
         else:
             pygame.transform.scale(baixo, (LARGURA, ALTURA), tela)  # amplia direto na tela
+        self.clima.desenhar_frente(tela, self)  # (chuva, folhas, mar... na tela grande: a chuva fininha não some)
+        if en and zoom <= 1.01:
+            en.desenhar_frente(tela, self.t_total)  # (morcegos, fantasminha, neblina)
+        ult2.desenhar_escuro(self, tela)  # CAÇADA NO ESCURO (Tromos): cada PC desenha o seu escuro
         if self.cinema > 0.02:  # faixas pretas de cinema
             faixa = int(62 * self.cinema)
             tela.fill(PRETO, (0, 0, LARGURA, faixa))
@@ -802,7 +1253,11 @@ class Partida:
                 self._branco.fill(BRANCO)
             self._branco.set_alpha(int(255 * self.clarao / 8))
             tela.blit(self._branco, (0, 0))
-        if self.fase == "entrada":
+        if getattr(self, "narrador", None):
+            self.narrador.desenhar(tela)
+        if self.fase == "falas":
+            self.desenhar_falas(tela)
+        if self.fase in ("entrada", "falas") and not getattr(self, "online", False):
             texto(tela, "ENTER pula", 13, (220, 220, 230), (LARGURA - 60, ALTURA - 14))
         elif self.cinema < 0.5:
             self.hud(tela)
@@ -872,7 +1327,21 @@ class Partida:
         y = ALTURA - 32
         cheia = l.barra >= BARRA_MAX
         pygame.draw.rect(tela, (10, 10, 20), (x - 3, y - 3, bw + 6, bh + 6), border_radius=4)
-        w = int(bw * l.barra / BARRA_MAX)
+        w = int(bw * min(l.barra, BARRA_MAX) / BARRA_MAX)
+        # a parte AMARELA (2ª ULTIMATE): metade do tamanho, em cima da azul, enchendo depois que a azul encheu
+        aw, ah = bw // 2, 7
+        ax = x if i == 0 else x + bw - aw
+        ay = y - ah - 5
+        amarela_cheia = l.barra >= BARRA_TOTAL
+        if l.tem_ult2():
+            pygame.draw.rect(tela, (10, 10, 20), (ax - 2, ay - 2, aw + 4, ah + 4), border_radius=3)
+            wa = int(aw * max(0, l.barra - BARRA_MAX) / BARRA_AMARELA)
+            if wa > 0:
+                pulso = (math.sin(self.t_total * 0.3) + 1) / 2 if amarela_cheia else 0
+                cor_a = mistura_cor((255, 200, 30), (255, 250, 200), pulso)
+                pygame.draw.rect(tela, cor_a, (ax if i == 0 else ax + aw - wa, ay, wa, ah), border_radius=2)
+        elif cheia and l.f.get("nome_base", l.f["nome"]) == "RIBBAT":  # (o Ribbat não precisa de 2ª ultimate)
+            texto(tela, "NÃO PRECISA", 12, (255, 220, 90), (ax + aw // 2, ay + 3))
         x0 = x if i == 0 else x + bw - w
         if w > 0:
             pulso = (math.sin(self.t_total * 0.25) + 1) / 2 if cheia else 0
@@ -883,7 +1352,10 @@ class Partida:
             pygame.draw.line(tela, (10, 10, 20), (x + bw * k // 4, y), (x + bw * k // 4, y + bh), 2)
         if cheia:
             esc = 1 + 0.08 * math.sin(self.t_total * 0.25)
-            texto_grande(tela, "ULTIMATE!", 18, (255, 230, 90), (x + bw // 2, y - 16), esc)
+            if amarela_cheia:
+                texto_grande(tela, "ULTIMATE 2!", 18, (255, 200, 40), (x + bw // 2, y - 31), esc)
+            elif not l.tem_ult2() or l.barra < BARRA_MAX + BARRA_AMARELA // 4:
+                texto_grande(tela, "ULTIMATE!", 18, (255, 230, 90), (x + bw // 2, y - 31), esc)
         mun = l.extra.get("municao")
         if mun:  # munição do personagem (ex: shurikens do Rib)
             n, total, bloqueado = mun
@@ -906,6 +1378,8 @@ class Partida:
             pygame.draw.circle(tela, AMARELO, (cx, cy), 6 + armado // 5, 2)
 
     def hud(self, tela):
+        if getattr(self, "meia", None):  # NATAL: "MEIA DE NATAL! 5/17" / "GORRINHO LIBERADO!"
+            self.meia.desenhar_aviso(tela)
         if self.trio:
             self.desenhar_trio(tela)
         if self.regras:  # MODOS MALUCOS ligados
@@ -948,6 +1422,11 @@ class Partida:
             lado, q = self.quebra_txt
             esc = 1 + max(0, (q - 70) / 10) * 0.5
             texto_grande(tela, "GUARDA QUEBRADA!", 30, (140, 210, 255), (LARGURA // 2, 160), esc, contorno=(10, 20, 50))
+        if self.choque_txt:
+            txt, quem, q = self.choque_txt
+            esc = 1 + max(0, (q - 70) / 10) * 0.6
+            x = LARGURA // 2 if quem is None else (190 if quem == 0 else LARGURA - 190)
+            texto_grande(tela, txt, 30, (255, 230, 90), (x, 150), esc, contorno=(60, 20, 0))
         if self.parry_txt:
             lado, q = self.parry_txt
             esc = 1 + max(0, (q - 50) / 10) * 0.6
@@ -988,11 +1467,18 @@ class Partida:
             texto(tela, msg, 22 if len(msg) < 60 else 18, BRANCO, (LARGURA // 2, 280))
             if self.premio:
                 self.desenhar_premio(tela)
+            if getattr(self, "maestria_info", None):
+                self.desenhar_maestria(tela)
+            self.desenhar_conquistas(tela)
+            if getattr(self, "figurinha_ganha", None) and self.tf < 200:  # a FIGURINHA que saiu (girando)
+                import figurinhas
+                figurinhas.desenhar_ganho(tela, self.figurinha_ganha, self.tf)
 
     def desenhar_premio(self, tela):
         """O quadro das moedas que ganhou (e os desafios cumpridos)."""
         itens, nivel, mult, total, cumpridos = self.premio
-        linhas = max(1, len(itens)) + len(cumpridos) + 2
+        doces = getattr(self, "doces_ganhos", 0)
+        linhas = max(1, len(itens)) + len(cumpridos) + 2 + (1 if doces else 0)
         r = pygame.Rect(LARGURA // 2 - 230, 302, 460, 20 + linhas * 21)
         caixa = pygame.Surface(r.size, pygame.SRCALPHA)
         caixa.fill((14, 10, 26, 215))
@@ -1012,6 +1498,12 @@ class Partida:
         for nome, v in cumpridos:
             texto(tela, f"DESAFIO! {nome}", 13, (150, 230, 255), (r.centerx - 40, y))
             texto(tela, f"+{v}", 15, (255, 220, 90), (r.right - 40, y))
+            y += 21
+        if doces:  # HALLOWEEN: os doces da luta
+            from efeitos import doce
+            texto(tela, "HALLOWEEN!", 14, (255, 150, 50), (r.centerx - 60, y))
+            doce(tela, (r.right - 84, y), 9, self.tf)
+            texto(tela, f"+{doces}", 15, (255, 150, 50), (r.right - 52, y))
             y += 21
         k = min(1.0, self.tf / 40)
         geral = total + sum(v for _, v in cumpridos)

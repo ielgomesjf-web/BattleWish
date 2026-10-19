@@ -14,6 +14,21 @@ _ok = None
 _musica_atual = None
 VOLUME_EFEITOS = 0.55
 VOLUME_MUSICA = 0.32
+MULT_EFEITOS = MULT_MUSICA = 1.0  # o que o jogador escolheu nas CONFIGURAÇÕES (0 a 1)
+
+
+def aplicar_volumes():
+    """Lê os volumes das CONFIGURAÇÕES (no save) e já aplica na música que está tocando."""
+    global MULT_EFEITOS, MULT_MUSICA
+    import save
+    MULT_MUSICA = save.d().get("vol_musica", 100) / 100
+    MULT_EFEITOS = save.d().get("vol_efeitos", 100) / 100
+    chave = "musica_" + str(_musica_atual)
+    if chave in _sons:
+        try:
+            _sons[chave].set_volume(VOLUME_MUSICA * MULT_MUSICA)
+        except Exception:
+            pass
 
 
 def _iniciar():
@@ -192,7 +207,7 @@ def tocar(nome, vol=1.0):
         if nome not in _sons:
             _sons[nome] = _criar(nome)
         s = _sons[nome]
-        s.set_volume(VOLUME_EFEITOS * vol)
+        s.set_volume(VOLUME_EFEITOS * vol * MULT_EFEITOS)
         s.play()
     except Exception:  # som nunca pode derrubar o jogo
         pass
@@ -273,7 +288,7 @@ def musica(nome):
         chave = "musica_" + nome
         if chave not in _sons:
             _sons[chave] = _musica_luta() if nome == "luta" else _musica_menu()
-        _sons[chave].set_volume(VOLUME_MUSICA)
+        _sons[chave].set_volume(VOLUME_MUSICA * MULT_MUSICA)
         canal.play(_sons[chave], loops=-1)
     except Exception:
         pass

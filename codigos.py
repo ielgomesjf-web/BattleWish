@@ -14,6 +14,37 @@ CODIGOS = {"ULTRA-MEGA-FROG": ("ribbat", "RIBBAT DESBLOQUEADO!"),
            "ULTRA-MEGA-VILLAGE": ("cenario", "VILA DOS SAPOS DESBLOQUEADA!")}
 
 
+# CHARADAS (pedido do Gomes): a pista da roupa secreta na loja, sem entregar o código. Nível MÉDIO.
+CHARADAS = {
+    "IRONMAN": "Um herói inteiro feito de ferro voa por aí. Chame ele na língua dos filmes, tudo junto.",
+    "FIGHTMON": "Monstrinhos de bolso que vivem lutando. Junte 'luta' com o começo de 'monstro', na língua dos filmes.",
+    "DINOWOLF": "Metade réptil gigante de antigamente, metade bicho que uiva pra lua. Na língua dos filmes, tudo junto.",
+    "DESTEMIBLEWARRIOR": "Um guerreiro que não tem medo de nada. 'Destemido' quase do jeito daqui, e 'guerreiro' na "
+                         "língua dos filmes.",
+    "MEGACANNON": "A arma do braço dele, só que muito, muito maior. Na língua dos filmes, tudo junto.",
+    "THEBESTMAGICIAN": "Não é um mago qualquer: é o melhor de todos. Diga 'o melhor mágico' na língua dos filmes.",
+    "CARDFIGHT": "Duas coisas que ele faz: jogar carta e brigar. Na língua dos filmes, com um & no meio.",
+    "UNTAMABLE": "Ninguém consegue domar essa fera. Diga 'indomável' na língua dos filmes.",
+    "FENRIR": "O lobo gigante das lendas nórdicas, de quem até os deuses tinham medo. Diga o nome dele.",
+    "THEMOONISMINE": "Um vilão olha pro céu e grita que a lua é dele. Diga a frase na língua dos filmes, tudo junto.",
+    "TIGERHAT": "Um gatão listrado usando a cartola. Diga o bicho e o chapéu na língua dos filmes.",
+    "MAGICCREATURES": "Seres mágicos e assombrados. Diga 'criaturas mágicas' na língua dos filmes.",
+    "MASTEROFTACTICS": "O raptor mais esperto do bando, mestre em planos de caça. Diga 'mestre das táticas' na língua "
+                       "dos filmes.",
+    "ANCIENTJAW": "O avô de todos os tubarões tinha a mandíbula mais antiga do mar. Diga isso na língua dos filmes.",
+    "BIGFOOTPRINT": "Na floresta ficou a marca de um pé enorme. Diga isso na língua dos filmes, tudo junto.",
+    "THEDARKESTDUMMY": "O boneco de treino mais sombrio que existe. Diga isso na língua dos filmes, tudo junto.",
+    "BRUTEFORTUNE": "Força bruta e uma fortuna em ouro. Junte as duas na língua dos filmes.",
+    "ULTRAMEGASKINS": "Ultra, mega e roupas, na língua dos filmes, com tracinhos. O sapo mais roubado agradece.",
+    "ULTRAMEGAFROG": "Ultra, mega e o bicho que diz ribbit, na língua dos filmes, com tracinhos.",
+    "ULTRAMEGAVILLAGE": "Ultra, mega e o lugar onde os sapos moram, na língua dos filmes, com tracinhos.",
+}
+
+
+def charada(codigo):
+    return CHARADAS.get(_limpo(codigo or ""))
+
+
 def _limpo(c):
     """Tanto faz maiúscula, espaço ou tracinho: Iron Man = IRON-MAN = IRONMAN."""
     return "".join(ch for ch in c.upper() if ch.isalnum())
@@ -77,7 +108,7 @@ class TelaCodigos:
                 som.tocar("defesa")
             self.msg_t = 180
             self.digitado = ""
-        elif ev.unicode and (ev.unicode.isalnum() or ev.unicode in "-_") and len(self.digitado) < 24:
+        elif ev.unicode and (ev.unicode.isalnum() or ev.unicode in "-_&") and len(self.digitado) < 24:
             self.digitado += ev.unicode.upper()
             som.tocar("blip", 0.5)
 
@@ -106,7 +137,15 @@ class TelaCodigos:
                 texto(tela, dica, 16, (220, 220, 235), (LARGURA // 2, 386))
             else:
                 texto(tela, self.msg, 22, (255, 130, 110), (LARGURA // 2, 330))
+        faltam = [c for c in CODIGOS if not ativo(c) and charada(c)]
+        if faltam:  # as PISTAS dos segredos que ainda faltam (Ribbat e a Vila), sem entregar o código
+            texto(tela, "PISTAS DOS SEGREDOS", 13, (255, 200, 90), (LARGURA // 2, 412))
+            fnt = pygame.font.SysFont("arial", 14, bold=True)
+            for i, c in enumerate(faltam):
+                quem = "LUTADOR SECRETO" if CODIGOS[c][0] == "ribbat" else "CENÁRIO SECRETO"
+                img = fnt.render(f"{quem}: {charada(c)}", True, (235, 230, 250))
+                tela.blit(img, (LARGURA // 2 - img.get_width() // 2, 424 + i * 20))
         n = len(save.d().get("codigos", []))
         if n:
-            texto(tela, f"códigos descobertos: {n}", 14, (190, 190, 210), (LARGURA // 2, 460))
+            texto(tela, f"códigos descobertos: {n}", 14, (190, 190, 210), (LARGURA // 2, 484))
         texto(tela, "ENTER confirma   BACKSPACE apaga   ESC volta", 14, (200, 200, 220), (LARGURA // 2, ALTURA - 16))
