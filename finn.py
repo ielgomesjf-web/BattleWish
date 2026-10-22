@@ -50,6 +50,15 @@ POSES_FINN = {
                         ct=(26, 98), mt=(50, 104), cf=(28, 100), mf=(52, 108)),
     "f_vitoria": dict(pt=(-20, 0), jt=(-16, 28), pf=(20, 0), jf=(18, 28), qd=(0, 56), pc=(2, 92), cb=(4, 110),
                       ct=(-12, 74), mt=(-22, 84), cf=(14, 102), mf=(20, 126)),
+    # (as poses do meio: deixam os golpes FLUIDOS — pedido do Gomes)
+    "f_levita_carrega": dict(pt=(-20, 0), jt=(-14, 26), pf=(20, 0), jf=(22, 26), qd=(0, 50), pc=(2, 86), cb=(6, 104),
+                             ct=(-8, 64), mt=(-2, 52), cf=(14, 62), mf=(26, 54)),
+    "f_levita_alto": dict(pt=(-22, 0), jt=(-16, 28), pf=(22, 0), jf=(24, 28), qd=(0, 56), pc=(4, 92), cb=(8, 110),
+                          ct=(-10, 72), mt=(-4, 58), cf=(20, 102), mf=(30, 126)),
+    "f_empurra_prep": dict(pt=(-22, 0), jt=(-14, 26), pf=(22, 0), jf=(24, 28), qd=(0, 52), pc=(-4, 88), cb=(0, 106),
+                           ct=(-8, 80), mt=(-14, 90), cf=(-10, 74), mf=(-26, 74)),
+    "f_empurra2": dict(pt=(-38, 8), jt=(-20, 28), pf=(30, 0), jf=(32, 28), qd=(0, 46), pc=(24, 80), cb=(32, 94),
+                       ct=(34, 80), mt=(56, 86), cf=(-4, 74), mf=(-22, 70)),
 }
 proporcionar(POSES_FINN)
 
@@ -406,14 +415,16 @@ _registra("finn_fogo", ini=18, ativo=1, rec=24, proj=True, raio=15, vel=8, dano=
           quadros=[(0, "parado"), (10, "f_carrega"), (17, "f_lanca"), (30, "f_lanca"), (43, "parado")])
 _registra("finn_levita", ini=L_INI, ativo=8, rec=L_FIM - L_INI - 8, janelas=((L_INI, L_INI + 8),), dano=12, hit=20,
           defe=10, emp=0, nivel="medio", lanca=15, logica=levitar, efeito=levitar_efeito, ia="medio",
-          quadros=[(0, "parado"), (8, "f_levita"), (L_FIM - 8, "f_levita"), (L_FIM, "parado")])
+          quadros=[(0, "parado"), (6, "f_levita_carrega"), (L_INI - 4, "f_levita_carrega"), (L_INI - 1, "f_levita"),
+                   (L_INI + 4, "f_levita_alto"), (L_FIM - 8, "f_levita_alto"), (L_FIM, "parado")])
 _registra("finn_cajado", ini=B_INI, ativo=B_HITS * B_INTERVALO, rec=14,
           janelas=tuple((B_INI + k * B_INTERVALO, B_INI + k * B_INTERVALO + 3) for k in range(B_HITS)),
           caixa=(10, 40, 92, 124), dano=5, hit=12, defe=8, emp=1, nivel="medio", logica=barrage,
           efeito=barrage_efeito, ia="perto", quadros=barrage_quadros())
 _registra("finn_empurra", ini=S_INI, ativo=S_FIM - S_INI, rec=12, janelas=((S_INI, S_FIM),), caixa=(0, 20, 60, 120),
           dano=7, hit=16, defe=10, emp=4, nivel="medio", logica=empurrao, ia="medio", som="vento",
-          quadros=[(0, "parado"), (S_INI - 1, "f_empurra"), (S_FIM, "f_empurra"), (S_FIM + 12, "parado")])
+          quadros=[(0, "parado"), (3, "f_empurra_prep"), (S_INI, "f_empurra"), (S_INI + 6, "f_empurra2"),
+                   (S_FIM, "f_empurra2"), (S_FIM + 12, "parado")])
 _registra("finn_sol", ini=0, ativo=1, rec=0, proj=True, raio=40, vel=9, dano=40, hit=40, defe=20, emp=6,
           nivel="medio", derruba=True, voo=(6, 10), ultimate=True, varios=True, atravessa=True)
 _registra("finn_ultimate", ini=1, ativo=1, rec=0, dano=0, hit=0, defe=0, emp=0, nivel="medio", ultimate=True,

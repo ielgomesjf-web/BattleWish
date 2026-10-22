@@ -33,6 +33,7 @@ CHARADAS = {
                        "dos filmes.",
     "ANCIENTJAW": "O avô de todos os tubarões tinha a mandíbula mais antiga do mar. Diga isso na língua dos filmes.",
     "BIGFOOTPRINT": "Na floresta ficou a marca de um pé enorme. Diga isso na língua dos filmes, tudo junto.",
+    "PARADISEHELL": "Opostos do outro mundo.",
     "THEDARKESTDUMMY": "O boneco de treino mais sombrio que existe. Diga isso na língua dos filmes, tudo junto.",
     "BRUTEFORTUNE": "Força bruta e uma fortuna em ouro. Junte as duas na língua dos filmes.",
     "ULTRAMEGASKINS": "Ultra, mega e roupas, na língua dos filmes, com tracinhos. O sapo mais roubado agradece.",

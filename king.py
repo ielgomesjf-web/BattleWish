@@ -58,6 +58,9 @@ POSES_KING = {
                      ct=(-10, 74), mt=(-2, 86), cf=(16, 108), mf=(22, 128)),
     "k_arremessa": dict(pt=(-28, 0), jt=(-20, 26), pf=(24, 0), jf=(28, 28), qd=(-2, 50), pc=(-6, 86), cb=(-10, 104),
                         ct=(-16, 100), mt=(-26, 118), cf=(-10, 102), mf=(-18, 122)),
+    # (o corpo balançando junto com o nunchaku no R — pedido do Gomes: mais fluido)
+    "k_gira2": dict(pt=(-30, 0), jt=(-20, 26), pf=(26, 0), jf=(30, 28), qd=(0, 48), pc=(6, 86), cb=(10, 102),
+                    ct=(-8, 72), mt=(2, 80), cf=(24, 80), mf=(40, 74)),
 }
 proporcionar(POSES_KING)
 
@@ -344,11 +347,20 @@ GOLPES["king_bumerangue"]["proj"] = False
 _registra("king_chute", ini=12, ativo=8, rec=18, janelas=((13, 21),), caixa=(16, 60, 104, 170), dano=15, hit=20,
           defe=12, emp=2, nivel="medio", lanca=16, logica=chute_acrobatico, ia="perto", som="vento",
           quadros=[(0, "parado"), (8, "k_estrela"), (14, "k_chute_alto"), (24, "k_chute_alto"), (38, "parado")])
+def giro_quadros():
+    """O R: o corpo vai e volta junto com cada pancada do nunchaku."""
+    q = [(0, "parado"), (G_INI - 2, "k_gira")]
+    for k in range(G_HITS):
+        t = G_INI + k * G_INTERVALO
+        q += [(t + 1, "k_gira"), (t + G_INTERVALO // 2 + 1, "k_gira2")]
+    fim = G_INI + G_HITS * G_INTERVALO
+    return q + [(fim, "k_gira"), (fim + 14, "parado")]
+
+
 _registra("king_giro", ini=G_INI, ativo=G_HITS * G_INTERVALO, rec=14,
           janelas=tuple((G_INI + k * G_INTERVALO, G_INI + k * G_INTERVALO + 3) for k in range(G_HITS)),
           caixa=(0, 40, 92, 130), dano=2, hit=8, defe=6, emp=1, nivel="medio", logica=giratorio, ia="medio",
-          pode=tem_nunchaku, quadros=[(0, "parado"), (G_INI - 2, "k_gira"), (G_INI + G_HITS * G_INTERVALO, "k_gira"),
-                                      (G_INI + G_HITS * G_INTERVALO + 14, "parado")])
+          pode=tem_nunchaku, quadros=giro_quadros())
 _registra("king_salto", ini=S_PLANTA, ativo=S_VOA - S_PLANTA, rec=S_FIM - S_VOA, janelas=((S_PLANTA + 2, S_VOA),),
           caixa=(-24, 0, 40, 120), dano=6, hit=16, defe=10, emp=7, nivel="medio", logica=salto, ia="medio",
           pode=tem_nunchaku, som="vento",

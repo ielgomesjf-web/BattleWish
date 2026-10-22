@@ -48,6 +48,11 @@ POSES_KUN = {
                      ct=(8, 46), mt=(18, 32), cf=(30, 40), mf=(46, 16)),
     "k_vitoria": dict(pt=(-20, 0), jt=(-16, 28), pf=(20, 0), jf=(18, 28), qd=(0, 56), pc=(2, 92), cb=(4, 110),
                       ct=(-10, 72), mt=(-4, 58), cf=(16, 104), mf=(20, 128)),
+    # (as poses do meio: deixam os golpes FLUIDOS — pedido do Gomes)
+    "k_lanca_prep": dict(pt=(-26, 0), jt=(-16, 26), pf=(24, 0), jf=(26, 28), qd=(0, 50), pc=(0, 88), cb=(4, 106),
+                         ct=(10, 78), mt=(20, 84), cf=(-4, 96), mf=(-16, 108)),
+    "k_lanca_fim": dict(pt=(-28, 0), jt=(-18, 26), pf=(28, 0), jf=(30, 28), qd=(0, 48), pc=(14, 84), cb=(20, 100),
+                        ct=(-12, 74), mt=(-24, 80), cf=(32, 80), mf=(52, 70)),
 }
 proporcionar(POSES_KUN)
 
@@ -390,11 +395,13 @@ def _registra(nome, **g):
 
 _registra("kun_carta", ini=7, ativo=1, rec=12, proj=True, varios=True, raio=8, vel=14, dano=5, hit=10, defe=8, emp=2,
           nivel="medio", ia="longe", som="shuriken", desenho_proj=desenha_carta_voando,
-          quadros=[(0, "parado"), (4, "k_lanca"), (14, "k_lanca"), (20, "parado")])
+          quadros=[(0, "parado"), (4, "k_lanca_prep"), (7, "k_lanca"), (10, "k_lanca_fim"), (14, "k_lanca_fim"),
+                   (20, "parado")])
 _registra("kun_shoryuken", ini=Q_BRINCA, ativo=Q_SOBE, rec=30, janelas=((Q_BRINCA, Q_BRINCA + Q_SOBE),), dano=25,
           hit=24, defe=14, emp=2, nivel="medio", lanca=17, logica=shoryuken, efeito=shoryuken_efeito, ia="perto",
-          quadros=[(0, "parado"), (4, "k_brinca"), (Q_BRINCA - 2, "k_brinca"), (Q_BRINCA + 1, "k_shoryu"),
-                   (Q_BRINCA + 26, "k_shoryu"), (Q_BRINCA + 44, "parado")])
+          quadros=[(0, "parado"), (4, "k_brinca"), (Q_BRINCA - 4, "k_brinca"), (Q_BRINCA - 1, "k_agacha"),
+                   (Q_BRINCA + 2, "k_shoryu"), (Q_BRINCA + 26, "k_shoryu"), (Q_BRINCA + 32, "k_agacha"),
+                   (Q_BRINCA + 44, "parado")])
 GOLPES["kun_shoryuken"]["total"] = 9999
 _registra("kun_espada", ini=R_INI, ativo=R_HITS * R_INTERVALO, rec=12,
           janelas=tuple((R_INI + k * R_INTERVALO, R_INI + k * R_INTERVALO + 3) for k in range(R_HITS)),
@@ -402,7 +409,8 @@ _registra("kun_espada", ini=R_INI, ativo=R_HITS * R_INTERVALO, rec=12,
           ia="perto", quadros=espada_quadros())
 _registra("kun_teleporte", ini=S_JOGA, ativo=1, rec=S_FIM - S_JOGA - 1, dano=0, hit=0, defe=0, emp=0, nivel="medio",
           logica=teleporte, efeito=teleporte_efeito, ia="medio",
-          quadros=[(0, "parado"), (S_JOGA - 2, "k_lanca"), (S_JOGA + 6, "parado")])
+          quadros=[(0, "parado"), (2, "k_lanca_prep"), (S_JOGA, "k_lanca"), (S_JOGA + 4, "k_lanca_fim"),
+                   (S_TELE - 1, "parado"), (S_TELE + 1, "k_agacha"), (S_FIM, "parado")])
 for _tipo, _dano in MOVEIS:
     _registra("kun_" + _tipo, ini=0, ativo=1, rec=0, proj=True, raio=26, vel=12, dano=_dano, hit=18, defe=10, emp=3,
               nivel="medio", varios=True, ultimate=True, atravessa=True, guarda_custo=10)

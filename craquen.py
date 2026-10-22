@@ -54,6 +54,11 @@ POSES_CRAQUEN = {
                      ct=(-10, 72), mt=(-6, 58), cf=(16, 84), mf=(12, 100)),
     "q_ri": dict(pt=(-20, 0), jt=(-16, 28), pf=(20, 0), jf=(18, 28), qd=(0, 56), pc=(-2, 92), cb=(-6, 110),
                  ct=(-10, 72), mt=(-4, 58), cf=(16, 104), mf=(20, 128)),
+    # (o tentáculo: chama com a mão perto do chão e LEVANTA com força — pedido do Gomes: mais fluido)
+    "q_comanda_prep": dict(pt=(-22, 0), jt=(-14, 24), pf=(22, 0), jf=(24, 24), qd=(0, 46), pc=(8, 82), cb=(12, 100),
+                           ct=(-8, 68), mt=(-4, 56), cf=(22, 64), mf=(34, 52)),
+    "q_comanda_forte": dict(pt=(-22, 0), jt=(-14, 26), pf=(22, 0), jf=(24, 28), qd=(0, 54), pc=(2, 90), cb=(4, 108),
+                            ct=(-10, 74), mt=(-6, 62), cf=(20, 104), mf=(32, 124)),
 }
 proporcionar(POSES_CRAQUEN)
 
@@ -427,7 +432,9 @@ _registra("craquen_ancora", ini=E_SAI, ativo=E_VAI, rec=14, janelas=((E_SAI + 1,
 GOLPES["craquen_ancora"]["total"] = 9999
 _registra("craquen_tentaculo", ini=Q_INI, ativo=Q_ATIVO, rec=20, caixa=(58, 0, 128, 140), dano=11, hit=24, defe=12,
           emp=2, nivel="medio", lanca=17, efeito=tentaculo_efeito, ia="anti", som="terra",
-          quadros=[(0, "parado"), (6, "q_comanda"), (Q_INI + Q_ATIVO + 8, "q_comanda"), (Q_INI + Q_ATIVO + 20, "parado")])
+          quadros=[(0, "parado"), (5, "q_comanda_prep"), (Q_INI - 2, "q_comanda_prep"), (Q_INI + 1, "q_comanda"),
+                   (Q_INI + 5, "q_comanda_forte"), (Q_INI + Q_ATIVO + 8, "q_comanda_forte"),
+                   (Q_INI + Q_ATIVO + 20, "parado")])
 _registra("craquen_espada", ini=R_INI, ativo=R_HITS * R_INTERVALO, rec=12,
           janelas=tuple((R_INI + k * R_INTERVALO, R_INI + k * R_INTERVALO + 3) for k in range(R_HITS)),
           caixa=(12, 40, 96, 124), dano=3, hit=11, defe=7, emp=1, nivel="medio", logica=espada,

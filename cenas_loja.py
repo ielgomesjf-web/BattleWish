@@ -221,7 +221,7 @@ class CenaLoja:
 
 CENAS_ANIME = ("cena_max", "cena_frigantus", "cena_sphyrus", "cena_magnus", "cena_kun", "cena_rib", "cena_trafo",
                "cena_king", "cena_cannan", "cena_finn",
-               "cena_tromos", "cena_tai", "cena_tamer", "cena_john", "cena_craquen")
+               "cena_tromos", "cena_tai", "cena_tamer", "cena_john", "cena_craquen", "cena_nocturnus")
 
 
 def _pro_exe():
@@ -235,6 +235,7 @@ def _pro_exe():
     import cena_king  # noqa: F401
     import cena_kun  # noqa: F401
     import cena_magnus  # noqa: F401
+    import cena_nocturnus  # noqa: F401
     import cena_max  # noqa: F401
     import cena_rib  # noqa: F401
     import cena_tai  # noqa: F401

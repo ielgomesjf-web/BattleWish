@@ -388,92 +388,40 @@ def v4_sobe(c, q, t, k):
     c.camera(q, base, (xc + 40, (hy - 80 + CHAO + 20) / 2), 1.25, pixel=True)  # (do helicóptero até o chão)
 
 
-PAPO = ("cannan", "piloto", "cannan", "piloto", "cannan", "piloto")  # (quem fala, de 24 em 24 quadros: só as boquinhas)
-
-
-def cabeca_costas(q, x, y, e, olha, falando, t, cannan, pk):
-    """A CABEÇA vista de TRÁS (por cima do encosto), virando pro lado do outro (olha: -1 = pra esquerda,
-    +1 = pra direita, 0 = pra frente): de perfil aparece o rosto e a BOQUINHA mexendo quando fala."""
-    vira = abs(olha)
-    if cannan:  # o Cannan: cabelo castanho meio comprido
-        pele, cabelo = pk.get("p", (226, 178, 140)), pk.get("h", (92, 60, 36))
-    else:  # o piloto: capacete verde
-        pele, cabelo = (226, 180, 140), VERDE
-    cab = pygame.Rect(0, 0, 62 * e, 70 * e)
-    cab.center = (int(x), int(y))
-    pygame.draw.ellipse(q, BORDA, cab.inflate(6, 6))
-    pygame.draw.ellipse(q, pele, cab)
-    if cannan:  # o CABELO por cima (de trás), caindo até a nuca, mexendo com o vento
-        nuca = [(x - 34 * e, y - 6 * e), (x - 30 * e, y - 36 * e), (x, y - 42 * e), (x + 30 * e, y - 36 * e), (x + 34 * e, y - 6 * e)]
-        lado = -olha * 14 * e
-        pontas = [(x + 34 * e + lado, y + 26 * e), (x + 16 * e + lado, y + 40 * e + math.sin(t * 0.3) * 3 * e),
-                  (x + lado, y + 34 * e), (x - 16 * e + lado, y + 42 * e + math.sin(t * 0.3 + 1) * 3 * e), (x - 34 * e + lado, y + 26 * e)]
-        pygame.draw.polygon(q, BORDA, [(px, py - 2) for px, py in nuca + pontas])
-        pygame.draw.polygon(q, cabelo, nuca + pontas)
-        for i in range(5):  # as mechas
-            mx = x - 24 * e + i * 12 * e + lado * 0.5
-            pygame.draw.line(q, tuple(max(0, v - 30) for v in cabelo), (mx, y - 30 * e), (mx + lado * 0.4, y + 30 * e), max(1, int(2 * e)))
-    else:  # o CAPACETE do piloto (de trás) e o fone
-        capa = pygame.Rect(0, 0, 70 * e, 56 * e)
-        capa.midtop = (int(x), int(y - 40 * e))
-        pygame.draw.ellipse(q, BORDA, capa.inflate(6, 6))
-        pygame.draw.ellipse(q, VERDE, capa)
-        pygame.draw.ellipse(q, VERDE_CLARO, (capa.x + capa.w * 0.25, capa.y + 6 * e, capa.w * 0.3, capa.h * 0.3))
-        pygame.draw.rect(q, BORDA, (x - 34 * e, y + 2 * e, 68 * e, 6 * e))  # a tira do fone
-        for lado in (-1, 1):
-            pygame.draw.circle(q, BORDA, (int(x + lado * 32 * e), int(y + 4 * e)), int(10 * e))
-    if vira > 0.05:  # o ROSTO de PERFIL, saindo pro lado (por cima do cabelo/capacete): olho, nariz e a BOQUINHA
-        fx = x + olha * 30 * e
-        pygame.draw.ellipse(q, BORDA, (fx - 15 * e, y - 22 * e, 30 * e, 46 * e))
-        pygame.draw.ellipse(q, pele, (fx - 13 * e, y - 20 * e, 26 * e, 42 * e))
-        pygame.draw.polygon(q, pele, [(fx + olha * 10 * e, y - 4 * e), (fx + olha * 19 * e, y + 4 * e), (fx + olha * 10 * e, y + 7 * e)])  # o nariz
-        pygame.draw.lines(q, BORDA, False, [(fx + olha * 11 * e, y - 4 * e), (fx + olha * 19 * e, y + 4 * e), (fx + olha * 10 * e, y + 7 * e)], max(1, int(e)))
-        pygame.draw.circle(q, BORDA, (int(fx + olha * 5 * e), int(y - 7 * e)), max(2, int(3.4 * e)))  # o olho
-        if cannan:
-            pygame.draw.line(q, pk.get("s", (170, 80, 70)), (fx - olha * 2 * e, y + 2 * e), (fx + olha * 5 * e, y - 3 * e), max(1, int(2 * e)))  # a cicatriz
-            pygame.draw.polygon(q, cabelo, [(fx - 14 * e, y - 22 * e), (fx + olha * 12 * e, y - 24 * e), (fx - olha * 8 * e, y - 6 * e)])  # a franja
-        bx, by = fx + olha * 9 * e, y + 13 * e  # a BOQUINHA
-        if falando and (t // 4) % 2:
-            pygame.draw.ellipse(q, (110, 30, 30), (bx - 4 * e, by - 3 * e, 8 * e, 9 * e))
-            pygame.draw.ellipse(q, BORDA, (bx - 4 * e, by - 3 * e, 8 * e, 9 * e), max(1, int(e)))
-        else:
-            pygame.draw.line(q, BORDA, (bx - 4 * e, by), (bx + 3 * e, by), max(1, int(2 * e)))
-
-
 def v5_papo(c, q, t, k):
-    """5) A CÂMERA LÁ ATRÁS, dentro do helicóptero: os dois bancos da frente, o PILOTO e o CANNAN sentados lado a
-    lado, o céu passando pelo para-brisa... e eles batendo papo (sem texto: só viram a cabeça e as BOQUINHAS mexem)."""
+    """5) DE LONGE (pedido do Gomes): o HELICÓPTERO indo embora contra o céu, e na porta só o VULTO dos dois (o piloto
+    e o Cannan) batendo papo: uns balõezinhos de "..." saindo de um e do outro, sem texto."""
+    from efeitos import texto
     w, h = q.get_size()
-    ceu(c, q, t, 1.2)
-    balanco = math.sin(t * 0.07) * 4
-    sup = pygame.Surface((w, h), pygame.SRCALPHA)  # a CABINE: o teto, as colunas e o painel embaixo do para-brisa
-    pygame.draw.polygon(sup, (40, 44, 34), [(0, 0), (w, 0), (w, h * 0.16), (0, h * 0.16)])
-    pygame.draw.polygon(sup, (40, 44, 34), [(0, 0), (w * 0.08, h * 0.16), (w * 0.06, h), (0, h)])
-    pygame.draw.polygon(sup, (40, 44, 34), [(w, 0), (w * 0.92, h * 0.16), (w * 0.94, h), (w, h)])
-    pygame.draw.polygon(sup, (40, 44, 34), [(w * 0.49, h * 0.16), (w * 0.51, h * 0.16), (w * 0.52, h * 0.55), (w * 0.48, h * 0.55)])
-    pygame.draw.rect(sup, (50, 54, 44), (0, h * 0.52, w, h * 0.5))  # o painel
-    for i in range(10):
-        pygame.draw.circle(sup, (60, 230, 90) if (t // 10 + i) % 3 else (230, 60, 60), (int(w * 0.14 + i * w * 0.08), int(h * 0.56)), 4)
-    q.blit(sup, (0, 0))
-    pk = {k_: c.cor(k_, v) for k_, v in __import__("cannan").PALETA.items()}
-    i = min(len(PAPO) - 1, t // 24)
-    fala = PAPO[i]
-    cx_p, cx_c = w * 0.3, w * 0.7  # (o piloto na esquerda, o Cannan na direita)
-    for cx, quem in ((cx_p, "piloto"), (cx_c, "cannan")):
-        banco = pygame.Rect(0, 0, w * 0.28, h * 0.52)  # o ENCOSTO do banco (de trás)
-        banco.midtop = (int(cx), int(h * 0.62 + balanco))
-        pygame.draw.rect(q, BORDA, banco.inflate(8, 8), border_radius=24)
-        pygame.draw.rect(q, (64, 70, 50), banco, border_radius=22)
-        pygame.draw.rect(q, (80, 86, 62), (banco.x + 14, banco.y + 12, banco.w - 28, 14), border_radius=6)
-        for j in range(4):  # o estofado
-            pygame.draw.line(q, (52, 58, 40), (banco.x + 20, banco.y + 40 + j * 30), (banco.right - 20, banco.y + 40 + j * 30), 3)
-        if quem == "cannan":  # o CANHÃO no braço, aparecendo do lado do banco
-            pygame.draw.rect(q, BORDA, (banco.right - 10, banco.y + 30, 54, 90), border_radius=12)
-            pygame.draw.rect(q, pk.get("c", (140, 150, 160)), (banco.right - 6, banco.y + 34, 46, 82), border_radius=10)
-            for j in range(4):
-                pygame.draw.line(q, pk.get("g", (130, 220, 255)), (banco.right + 2, banco.y + 46 + j * 18), (banco.right + 32, banco.y + 46 + j * 18), 3)
-        olha = (1 if quem == "piloto" else -1) * (0.9 if fala == quem or (t % 24) > 6 else 0.4)
-        cabeca_costas(q, cx, h * 0.52 + balanco, 2.2, olha, fala == quem, t, quem == "cannan", pk)
+    ceu(c, q, t, 0.5)
+    u = t / 146
+    e = 0.95 - 0.5 * u  # (vai ficando pequeno: indo embora)
+    hx, hy = w * (0.36 + 0.4 * u), h * (0.56 - 0.18 * u) + math.sin(t * 0.08) * 4
+    vultos = []
+
+    def dentro(sup, pr):  # os dois VULTOS sentados na porta (pretinhos, contra a luz)
+        for j_, (fx, capacete) in enumerate(((0.32, False), (0.7, True))):
+            bx, by = pr.x + pr.w * fx, pr.bottom - 2
+            r = max(3, int(pr.h * 0.17))
+            pygame.draw.ellipse(sup, (10, 10, 10), (bx - r * 1.5, by - r * 2.6, r * 3, r * 2.8))  # os ombros
+            pygame.draw.circle(sup, (10, 10, 10), (int(bx), int(by - r * 3.1)), r)  # a cabeça
+            if capacete:  # (o Cannan: o capacete com a aba)
+                pygame.draw.ellipse(sup, (10, 10, 10), (bx - r * 1.3, by - r * 4.2, r * 2.6, r * 1.4))
+            vultos.append((j_, bx, by - r * 4.4))
+    sup = helicoptero(q, hx, hy, e, t, d=1, porta=True, inclina=-5, dentro=dentro)
+    ox, oy = hx - sup.get_width() * 0.58, hy - sup.get_height() * 0.56
+    fala = (t // 26) % 2  # (um de cada vez, de 26 em 26 quadros)
+    for j_, vx, vy in vultos:
+        if j_ != fala or (t % 26) < 4:
+            continue
+        bx, by = ox + vx, oy + vy - 18
+        r = pygame.Rect(0, 0, 66, 36)
+        r.midbottom = (int(bx + (12 if j_ else -12)), int(by))
+        pygame.draw.polygon(q, BORDA, [(bx, by + 10), (r.centerx - 6, r.bottom - 2), (r.centerx + 6, r.bottom - 2)])
+        pygame.draw.rect(q, BORDA, r.inflate(4, 4), border_radius=12)
+        pygame.draw.rect(q, (255, 255, 255), r, border_radius=11)
+        pontos = 1 + (t % 26) // 7
+        texto(q, "." * min(3, pontos), 32, BORDA, (r.centerx, r.centery - 6), sombra=False)
     if t >= 110:
         faixa_nome(q, "CANNAN", "MISSÃO CUMPRIDA.", COR_NOME, (t - 110) / 30)
 

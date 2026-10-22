@@ -2803,9 +2803,203 @@ def _frigantus(b, e, pose, t, f, prog=None):
     return res
 
 
+# ---- INAZUMANEKO, PIXEL POR PIXEL (o tigre samurai, e a MEIA-LUA de vento) ----
+def _pecas_inazumaneko():
+    import inazumaneko
+    from pecas import Peca
+    pal = inazumaneko.PALETA
+    return dict(
+        cabeca=Peca([
+            ".kk.......kk.",
+            ".ksk.....ksk.",
+            ".kswkkkkkwsk.",
+            "kwwwswswswwwk",
+            "kwwwwwswwwwwk",
+            "kswwwwwwwwwsk",
+            "kwkkwwwwwckwk",
+            "kwkoewwweokwk",
+            "kswwwwlwwcwsk",
+            "klwwwlllwwwlk",
+            "kllwlnnnlwllk",
+            "kllllklkllllk",
+            ".klllllllllk.",
+            "..kkkkkkkkk..",
+        ], pal, a=(6, 12), b=(6, 0), estica=False),
+        tronco=Peca([
+            "...kkkkkkkkkk...",
+            "..kGgwwwwwwgGk..",
+            ".kGggwwllwwggGk.",
+            ".kGgggwllwgggGk.",
+            ".kGrrrrrrrrrrGk.",
+            ".kGddddddddddGk.",
+            ".kGrrrrrrrrrrGk.",
+            ".kGddddddddddGk.",
+            ".kGrrrrrrrrrrGk.",
+            "..kGggggggggGk..",
+            "..kbbbbbbbbbbk..",
+            "..kbbbbddbbbbk..",
+            "..khhhhhhhhhhk..",
+            ".kHhhhhhhhhhhHk.",
+            ".kkkkkkkkkkkkkk.",
+        ], pal, a=(8, 13), b=(8, 1)),
+        braco=inazumaneko.BRACO,
+        antebraco=inazumaneko.ANTEBRACO,
+        mao=inazumaneko.MAO,
+        coxa=inazumaneko.COXA,
+        canela=inazumaneko.CANELA,
+        sapato=Peca([
+            ".kkkkk.",
+            "kwwwwwk",
+            "klklklk",
+            ".kkkkk.",
+        ], pal, a=(3, 0), b=(3, 3), estica=False),
+    )
+
+
+def postura_samurai(t):
+    """O INAZUMANEKO de frente: base firme, a mão da direita no cabo da katana (na cintura, do lado esquerdo)."""
+    r = math.sin(t * 0.08) * 0.6
+    return dict(pe_e=(-17, 0), pe_d=(17, 0), jo_e=(-19, 22), jo_d=(19, 22), qu_e=(-9, 40), qu_d=(9, 40),
+                om_e=(-15, 68 + r), om_d=(15, 68 + r), co_e=(-22, 56 + r), co_d=(14, 54 + r),
+                ma_e=(-14, 44 + r), ma_d=(-6, 46 + r), pe_coco=(0, 72 + r), cab=(0, 88 + r))
+
+
+def _rabo_tigre(b, e, t):
+    """O RABO saindo pro lado (atrás), cinza com anéis e a ponta preta virada pra cima."""
+    import inazumaneko
+    troca = pecas.TROCA or {}
+    cinza, preto = troca.get("w", inazumaneko.PALETA["w"]), troca.get("s", inazumaneko.PALETA["s"])
+    q = b.P((e["qu_d"][0] + 2, e["qu_d"][1] - 4))
+    pts = []
+    for i in range(8):
+        k = i / 7
+        pts.append((q[0] + 3 + 14 * k, q[1] + 2 - 14 * k ** 2.2 + math.sin(t * 0.08 + k * 3) * k))
+    for i, (a_, c_) in enumerate(zip(pts, pts[1:])):
+        pygame.draw.line(b.sup, preto if (i >= 5 or i in (1, 3)) else cinza, a_, c_, max(1, 3 - i // 3))
+
+
+def _cabos(b, e):
+    """Os DOIS cabos das katanas na cintura (do lado esquerdo dele), saindo das bainhas."""
+    x, y = b.P((e["qu_e"][0] - 2, e["qu_e"][1] + 6))
+    for i in range(2):
+        pygame.draw.line(b.sup, (16, 14, 20), (x - i * 2, y - i), (x - 7 - i * 2, y - 4 - i), 3)
+        pygame.draw.line(b.sup, (60, 44, 50), (x - i * 2, y - i), (x - 7 - i * 2, y - 4 - i), 1)
+        b.sup.set_at((int(x - i * 2), int(y - i)), (226, 186, 74))
+
+
+def _katana_frente(b, mao, ponta, brilho_cor=None):
+    """A katana na mão (de frente): lâmina clara com a guarda dourada; a mão vai POR CIMA do cabo."""
+    pygame.draw.line(b.sup, (16, 14, 20), mao, ponta, 3)
+    pygame.draw.line(b.sup, (226, 232, 242), mao, ponta, 1)
+    dx, dy = ponta[0] - mao[0], ponta[1] - mao[1]
+    n = math.hypot(dx, dy) or 1
+    g = (mao[0] + dx / n * 3, mao[1] + dy / n * 3)
+    pygame.draw.line(b.sup, (226, 186, 74), (g[0] - dy / n * 2, g[1] + dx / n * 2), (g[0] + dy / n * 2, g[1] - dx / n * 2), 1)
+    if brilho_cor:
+        b.sup.set_at((int(ponta[0]), int(ponta[1])), brilho_cor)
+
+
+def crescente_voando(tela, x, y, esc, t=0):
+    """A MEIA-LUA de vento vindo na câmera, em pixel art (pra cena): um arco em pé (o corte foi vertical).
+    (x, y) = o meio na tela; esc = tamanho de 1 pixel do jogo na tela (vai aumentando)."""
+    pal = {"k": (40, 70, 120), "A": (255, 255, 255), "a": (170, 220, 255)}
+    mapa = [
+            "....kkkk",
+            "..kkAAak",
+            ".kAAak..",
+            ".kAak...",
+            "kAAk....",
+            "kAak....",
+            "kAak....",
+            "kAak....",
+            "kAak....",
+            "kAAk....",
+            ".kAak...",
+            ".kAAak..",
+            "..kkAAak",
+            "....kkkk",
+        ]
+    peq = pygame.Surface((8, 14), pygame.SRCALPHA)
+    for yy, linha in enumerate(mapa):
+        for xx, ch in enumerate(linha):
+            if ch != ".":
+                peq.set_at((xx, yy), pal[ch])
+    img = pygame.transform.scale(peq, (round(8 * esc), round(14 * esc)))
+    tela.blit(img, (round(x - 4 * esc), round(y - 7 * esc)))
+
+
+def _inazumaneko(b, e, pose, t, f, prog=None):
+    pc = _peca("INAZUMANEKO", _pecas_inazumaneko)
+    import inazumaneko
+    import habilidades as hab
+    if pose in ("parado", "ataque"):
+        e = postura_samurai(t)
+    k = None if pose != "ataque" else ((t % 60) / 60 if prog is None else max(0.0, min(1.0, prog)))
+    soltou = k is not None and k >= 0.45
+    lamina = None  # (ponta da katana, em unidades)
+    if k is not None:
+        if k < 0.15:  # a mão no cabo
+            pass
+        elif k < 0.35:  # SACA e levanta com as duas mãos lá em cima
+            a = min(1.0, (k - 0.15) / 0.12)
+            e = dict(e, co_d=(14, 56 + 44 * a), ma_d=(-6 + 10 * a, 46 + 72 * a),
+                     co_e=(-22 + 8 * a, 56 + 44 * a), ma_e=(-14 + 10 * a, 44 + 74 * a))
+            lamina = (2, 118 + 34 * a)
+        elif k < 0.5:  # o CORTE VERTICAL (de cima pra baixo)
+            a = (k - 0.35) / 0.15
+            y = 118 - 58 * a
+            e = dict(e, co_d=(14, 100 - 34 * a), ma_d=(4, y), co_e=(-14, 100 - 34 * a), ma_e=(-4, y))
+            lamina = (0, y + 34 - 60 * a)
+        elif k < 0.8:  # parada embaixo, a lâmina apontando pro chão
+            e = dict(e, co_d=(14, 66), ma_d=(4, 60), co_e=(-14, 66), ma_e=(-4, 60))
+            lamina = (6, 30)
+        else:  # GUARDA (volta a mão pro cabo)
+            a = (k - 0.8) / 0.2
+            e = dict(e, co_d=(14, 66 - 12 * a), ma_d=(4 - 10 * a, 60 - 14 * a), co_e=(-14 - 8 * a, 66 - 10 * a),
+                     ma_e=(-4 - 10 * a, 60 - 16 * a))
+    _rabo_tigre(b, e, t)
+    montar_pecas(b, e, pc, "parado")
+    if f.get("estilo") == "oni":  # ONI (skin secreta): a máscara de demônio com chifres, de frente
+        px, py = b.P(e["pe_coco"])
+
+        def H(x, y):  # (um pixel da cabeça de frente -> a superfície)
+            return (px - 6 + x, py + 1 - 12 + y)
+        for base, ponta in (((2, 1), (0, -5)), ((10, 1), (12, -5))):  # os chifres
+            pygame.draw.polygon(b.sup, (232, 222, 192), [H(base[0] - 1, base[1]), H(*ponta), H(base[0] + 1, base[1])])
+        for base, ponta in (((2, 1), (0, -5)), ((10, 1), (12, -5))):  # a sombra dos chifres (do lado de fora)
+            pygame.draw.line(b.sup, (176, 164, 136), H(base[0] - 1, base[1]), H(*ponta), 1)
+        pygame.draw.polygon(b.sup, (200, 36, 40), [H(1, 6), H(12, 6), H(12, 10), H(10, 12), H(3, 12), H(1, 10)])
+        pygame.draw.polygon(b.sup, (128, 18, 26), [H(1, 10), H(12, 10), H(10, 12), H(3, 12)])  # a sombra embaixo
+        pygame.draw.line(b.sup, (226, 186, 74), H(2, 6), H(5, 7), 1)  # a SOBRANCELHA DOURADA brava (em V)
+        pygame.draw.line(b.sup, (226, 186, 74), H(11, 6), H(8, 7), 1)
+        for x in (3.5, 8.5):
+            b.sup.set_at((int(H(x, 8)[0]), int(H(x, 8)[1])), (20, 8, 12))  # o buraco do olho...
+            b.sup.set_at((int(H(x, 8)[0]), int(H(x, 8)[1]) - 1), (255, 70, 56))  # ...com o brilho vermelho
+        for x in (4, 6, 8):  # a boca com as PRESAS
+            b.sup.set_at((int(H(x, 10.5)[0]), int(H(x, 10.5)[1])), (246, 242, 232))
+            b.sup.set_at((int(H(x + 1, 10.5)[0]), int(H(x + 1, 10.5)[1])), (20, 8, 12))
+    if lamina is None:
+        _cabos(b, e)
+    else:  # a katana na mão (e as mãos por cima do cabo)
+        cor = hab.COR_STATUS.get(f.get("_poder")) if False else None
+        mao = b.P(((e["ma_d"][0] + e["ma_e"][0]) / 2, (e["ma_d"][1] + e["ma_e"][1]) / 2))
+        _katana_frente(b, mao, b.P(lamina), cor)
+        for lado, esp in (("e", True), ("d", False)):
+            m_ = b.P(e[f"ma_{lado}"])
+            pc["mao"].desenhar(b.sup, m_, (m_[0], m_[1] + 4), 1, esp)
+        x, y = b.P((e["qu_e"][0] - 2, e["qu_e"][1] + 6))  # (a bainha vazia)
+        pygame.draw.line(b.sup, (16, 14, 20), (x, y), (x - 7, y - 4), 3)
+    cab = e["cab"]
+    res = dict(olhos=(cab[0], cab[1] + 3), mao=(0, 70) if k is not None else e["ma_d"], cabeca=cab)
+    if k is not None:
+        res["soltou"] = soltou
+    return res
+
+
 LUTADORES.update({"TROMOS": _tromos, "CRÁQUEN": _craquen, "MAGNUS": _magnus, "SPHYRUS": _sphyrus,
                   "FRIGANTUS": _frigantus})
 LARGO.update({"FRIGANTUS": 1.2})
+LUTADORES.update({"INAZUMANEKO": _inazumaneko})
 
 # =====================================================================
 # o desenho
@@ -2854,3 +3048,347 @@ def desenhar_frente(tela, ficha, x, y, escala, pose="parado", t=0, prog=None):
     def tela_de(u):
         return (gx + (ox + u[0] * k) * amplia, gy + (oy - u[1] * k) * amplia)
     return {nome_p: (tela_de(u) if isinstance(u, tuple) else u) for nome_p, u in pts.items()}
+
+
+# ---- NOCTURNUS, PIXEL POR PIXEL (o mutante morcego-escorpião, e a BOLA DE ECO) ----
+def _pecas_nocturnus():
+    import nocturnus
+    from pecas import Peca
+    pal = nocturnus.PALETA
+    return dict(
+        tronco=Peca([
+            "...kkkkkkkk...",
+            "..kfFfFfFfFk..",
+            ".kpfFfFfFfFpk.",
+            "kppfffffffffpk",
+            "kpppckckckpppk",
+            "kpppckckckpppk",
+            "kPppckckckppPk",
+            "kPpppffffpppPk",
+            ".kPppffffppPk.",
+            ".kPpppffpppPk.",
+            "..kPppppppPk..",
+            "..kPppppppPk..",
+            "...kkkkkkkk...",
+        ], pal, a=(7, 12), b=(7, 0)),
+        braco=nocturnus.BRACO,
+        antebraco=nocturnus.ANTEBRACO,
+        mao=nocturnus.MAO,
+        coxa=nocturnus.COXA,
+        canela=nocturnus.CANELA,
+        sapato=Peca([
+            ".kkkkkkk.",
+            "kpppppppk",
+            "kwkwkwkwk",
+            ".w.w.w.w.",
+        ], pal, a=(4, 0), b=(4, 3), estica=False),
+    )
+
+
+def _cor_noct(letra):
+    import nocturnus
+    return (pecas.TROCA or {}).get(letra, nocturnus.PALETA[letra])
+
+
+def postura_morcego(t):
+    """O NOCTURNUS de frente: CURVADO, pernas grossas abertas, as ASAS meio abertas dos lados (feito capa aberta)."""
+    r = math.sin(t * 0.08) * 0.8
+    return dict(pe_e=(-15, 0), pe_d=(15, 0), jo_e=(-17, 20), jo_d=(17, 20), qu_e=(-8, 38), qu_d=(8, 38),
+                om_e=(-12, 62 + r), om_d=(12, 62 + r), co_e=(-26, 58 + r), co_d=(26, 58 + r),
+                ma_e=(-34, 44 + r), ma_d=(34, 44 + r), pe_coco=(0, 66 + r), cab=(0, 78 + r))
+
+
+def _cauda_escorpiao(b, e, t):
+    """A CAUDA DE ESCORPIÃO saindo de trás do quadril e subindo em ARCO do lado dele, com a ponta curvada por cima do
+    ombro: gomos (claro/escuro), a bolsa de veneno e o FERRÃO vermelho apontando pra frente."""
+    borda, cor, claro = (16, 12, 22), _cor_noct("p"), _cor_noct("P")
+    pts = []
+    bal = math.sin(t * 0.07) * 2
+    c0, c1, c2, c3 = (8, 36), (44, 34), (46 + bal, 104), (22 + bal, 100)  # (o arco: sai pro lado, sobe e curva)
+    for i in range(12):
+        k = i / 11
+        u = 1 - k
+        x = u ** 3 * c0[0] + 3 * u * u * k * c1[0] + 3 * u * k * k * c2[0] + k ** 3 * c3[0]
+        y = u ** 3 * c0[1] + 3 * u * u * k * c1[1] + 3 * u * k * k * c2[1] + k ** 3 * c3[1]
+        pts.append(b.P((x, y)))
+    for i, (p0, p1) in enumerate(zip(pts, pts[1:])):
+        pygame.draw.line(b.sup, borda, p0, p1, 4 if i < 7 else 3)
+    for i, (p0, p1) in enumerate(zip(pts, pts[1:])):
+        pygame.draw.line(b.sup, claro if i % 2 else cor, p0, p1, 2 if i < 7 else 1)
+    fx, fy = pts[-1]
+    pygame.draw.circle(b.sup, borda, (int(fx), int(fy)), 3)
+    pygame.draw.circle(b.sup, claro, (int(fx), int(fy)), 2)
+    dx, dy = fx - pts[-2][0], fy - pts[-2][1]
+    n = math.hypot(dx, dy) or 1
+    ponta = (fx + dx / n * 5, fy + dy / n * 5 + 2)
+    pygame.draw.line(b.sup, borda, (fx, fy), ponta, 3)
+    pygame.draw.line(b.sup, _cor_noct("r"), (fx, fy), ponta, 1)
+    b.sup.set_at((int(ponta[0]), int(ponta[1])), _cor_noct("v"))
+
+
+def _asa_frente(b, e, lado, abre=1.0):
+    """A ASA de frente: a MEMBRANA do ombro até a mão e descendo pelos 3 dedos compridos até o quadril."""
+    P = b.P
+    s = -1 if lado == "e" else 1
+    o, c, m = e[f"om_{lado}"], e[f"co_{lado}"], e[f"ma_{lado}"]
+    q = (s * 6, 40)
+    dedos = [(m[0] + s * (3 + 6 * abre), m[1] - 8 - 6 * abre), (m[0] + s * 1, m[1] - 18 - 6 * abre),
+             (m[0] - s * (4 + 4 * abre), m[1] - 24 - 4 * abre)]
+    borda = (16, 12, 22)
+    contorno = [P(o), P(c), P(m)] + [P(d) for d in dedos] + [P(q)]
+    pygame.draw.polygon(b.sup, _cor_noct("m"), contorno)
+    meio = ((c[0] + q[0]) / 2, (c[1] + q[1]) / 2)
+    pygame.draw.polygon(b.sup, _cor_noct("M"), [P(meio), P(dedos[1]), P(dedos[2]), P(q)])
+    for d in dedos:  # os DEDOS (ossos da asa)
+        pygame.draw.line(b.sup, borda, P(m), P(d), 1)
+    pygame.draw.polygon(b.sup, borda, contorno, 1)
+
+
+def _cabeca_morcego(b, cab, t, boca=0.0):
+    """A CABEÇA de frente em pixel: as ORELHONAS de morcego (pontudas, abertas pros lados, uma CORTADA em cima) com
+    o aparelhinho azul embaixo, as marcas vermelhas, os olhos azuis acesos, o focinho curto e as presas."""
+    sup, borda = b.sup, (16, 12, 22)
+    cx, cy = b.P(cab)
+    cx, cy = int(cx), int(cy)
+    p, P_, m = _cor_noct("p"), _cor_noct("P"), _cor_noct("m")
+    for s_ in (-1, 1):  # as ORELHONAS (gota pontuda, inclinada pra fora)
+        base = [(cx + s_ * 2, cy - 4), (cx + s_ * 7, cy - 1)]
+        ponta = (cx + s_ * 11, cy - 19)
+        if s_ > 0:  # a CORTADA: a ponta reta, em zigue-zague
+            orelha = [base[0], (cx + s_ * 4, cy - 14), (cx + s_ * 7, cy - 15), (cx + s_ * 9, cy - 14),
+                      (cx + s_ * 10, cy - 15), base[1]]
+        else:
+            orelha = [base[0], (cx + s_ * 4, cy - 15), ponta, (cx + s_ * 11, cy - 10), base[1]]
+        pygame.draw.polygon(sup, p, orelha)
+        dentro = [((x - cx) * 0.6 + cx + s_ * 1.5, (y - cy) * 0.7 + cy - 1) for x, y in orelha]
+        pygame.draw.polygon(sup, m, dentro)
+        pygame.draw.polygon(sup, borda, orelha, 1)
+        ax, ay = cx + s_ * 6, cy - 4  # o APARELHINHO azul (embaixo da orelha)
+        pygame.draw.rect(sup, borda, (ax - 1, ay - 1, 3, 3))
+        sup.set_at((ax, ay), _cor_noct("b"))
+        if (t // 8) % 2:
+            sup.set_at((ax, ay), _cor_noct("B"))
+    pygame.draw.ellipse(sup, borda, (cx - 6, cy - 7, 13, 13))  # a CABEÇA
+    pygame.draw.ellipse(sup, p, (cx - 5, cy - 6, 11, 11))
+    pygame.draw.line(sup, P_, (cx - 2, cy - 5), (cx + 2, cy - 5))
+    pygame.draw.ellipse(sup, P_, (cx - 2, cy + 1, 5, 4))  # o focinho curto
+    for s_ in (-1, 1):
+        sup.set_at((cx + s_ * 1, cy - 4), _cor_noct("r"))  # as marcas vermelhas (em cima dos olhos)
+        sup.set_at((cx + s_ * 4, cy - 3), _cor_noct("r"))
+        for x in (2, 3):  # os OLHOS azuis acesos (2x2, puxados)
+            sup.set_at((cx + s_ * x, cy - 2 + (1 if x == 2 else 0)), _cor_noct("e"))
+            sup.set_at((cx + s_ * x, cy - 1), _cor_noct("e"))
+    sup.set_at((cx, cy + 1), borda)  # o nariz
+    abre = int(round(boca * 3))
+    pygame.draw.line(sup, borda, (cx - 2, cy + 3), (cx + 2, cy + 3))
+    if abre:
+        pygame.draw.rect(sup, (120, 30, 50), (cx - 2, cy + 3, 5, abre))
+        pygame.draw.rect(sup, borda, (cx - 3, cy + 2, 7, abre + 2), 1)
+    sup.set_at((cx - 1, cy + 4 + abre // 2), _cor_noct("w"))  # as PRESAS
+    sup.set_at((cx + 1, cy + 4 + abre // 2), _cor_noct("w"))
+
+
+def _desenha_nocturnus(b, e, pc, t, boca=0.0, abre=1.0):
+    P = b.P
+    _cauda_escorpiao(b, e, t)
+    for lado in ("e", "d"):
+        _asa_frente(b, e, lado, abre)
+    for lado, esp in (("e", True), ("d", False)):  # as PERNAS grossas com garras
+        q, j, pe = P(e[f"qu_{lado}"]), P(e[f"jo_{lado}"]), P(e[f"pe_{lado}"])
+        pc["canela"].desenhar(b.sup, j, pe, 1, esp)
+        pc["coxa"].desenhar(b.sup, q, j, 1, esp)
+        pc["sapato"].desenhar(b.sup, (pe[0], pe[1] - 3), (pe[0], pe[1]), 1, esp)
+    meio_q = P(((e["qu_e"][0] + e["qu_d"][0]) / 2, (e["qu_e"][1] + e["qu_d"][1]) / 2))
+    pc["tronco"].desenhar(b.sup, meio_q, P(e["pe_coco"]), 1, False)
+    for lado, esp in (("e", True), ("d", False)):  # os braços (o osso da asa) por cima da membrana
+        o, co, ma = P(e[f"om_{lado}"]), P(e[f"co_{lado}"]), P(e[f"ma_{lado}"])
+        pc["braco"].desenhar(b.sup, o, co, 1, esp)
+        pc["antebraco"].desenhar(b.sup, co, ma, 1, esp)
+        pc["mao"].desenhar(b.sup, ma, (ma[0], ma[1] - 2), 1, esp)
+    _cabeca_morcego(b, e["cab"], t, boca)
+
+
+def bola_eco_voando(tela, x, y, esc, t=0):
+    """A BOLA DE ECO vindo na câmera, em pixel art (pra cena): anéis azuis de distorção girando (não é uma bola
+    sólida: o ar tremendo)."""
+    peq = pygame.Surface((19, 19), pygame.SRCALPHA)
+    for i, (r, cor) in enumerate(((9, (70, 160, 255)), (6, (150, 220, 255)), (3, (230, 250, 255)))):
+        rr = r - (1 if (t // 3 + i) % 2 else 0)
+        pygame.draw.circle(peq, cor, (9, 9), rr, 1)
+    for i in range(4):  # o redemoinho
+        a = t * 0.35 + i * math.pi / 2
+        peq.set_at((int(9 + math.cos(a) * 7), int(9 + math.sin(a) * 7)), (255, 255, 255))
+    img = pygame.transform.scale(peq, (round(19 * esc), round(19 * esc)))
+    tela.blit(img, (round(x - 9.5 * esc), round(y - 9.5 * esc)))
+
+
+def _suave_noct(k):
+    k = max(0.0, min(1.0, k))
+    return k * k * (3 - 2 * k)
+
+
+def _nocturnus(b, e, pose, t, f, prog=None):
+    pc = _peca("NOCTURNUS", _pecas_nocturnus)
+    if pose in ("parado", "ataque"):
+        e = postura_morcego(t)
+    k = None if pose != "ataque" else ((t % 60) / 60 if prog is None else max(0.0, min(1.0, prog)))
+    boca, abre = 0.0, 0.6
+    if k is not None:
+        if k < 0.3:  # PUXA O AR: as asas sobem e abrem, a cabeça vai pra trás
+            a = _suave_noct(k / 0.3)
+            e = dict(e, co_e=(-28, 58 + 12 * a), co_d=(28, 58 + 12 * a), ma_e=(-38, 44 + 30 * a),
+                     ma_d=(38, 44 + 30 * a), cab=(0, 78 + 2 * a))
+            abre = 0.6 + 0.4 * a
+        elif k < 0.6:  # o GRITO: curva pra frente e solta a bola de eco
+            a = _suave_noct((k - 0.3) / 0.3)
+            e = dict(e, co_e=(-28, 70 - 14 * a), co_d=(28, 70 - 14 * a), ma_e=(-38, 74 - 30 * a),
+                     ma_d=(38, 74 - 30 * a), cab=(0, 80 - 4 * a), pe_coco=(0, 66 - 2 * a))
+            boca, abre = 1.0, 1.0
+        else:  # volta
+            a = _suave_noct((k - 0.6) / 0.4)
+            e = dict(e, cab=(0, 76 + 2 * a), pe_coco=(0, 64 + 2 * a))
+            boca, abre = max(0.0, 1 - a * 2), 1.0 - 0.4 * a
+    _desenha_nocturnus(b, e, pc, t, boca, abre)
+    cab = e["cab"]
+    res = dict(olhos=(cab[0], cab[1] + 1), mao=(0, cab[1] - 4), cabeca=cab)
+    if k is not None:
+        res["soltou"] = k >= 0.45
+    return res
+
+
+LUTADORES.update({"NOCTURNUS": _nocturnus})
+LARGO.update({"NOCTURNUS": 1.3})
+
+
+# ---- SILVANUS, PIXEL POR PIXEL (a planta carnívora de frente, e a SEMENTE voando na câmera) ----
+def _cor_silv(letra):
+    import silvanus
+    return (pecas.TROCA or {}).get(letra, silvanus.PALETA[letra])
+
+
+def _folha_frente(sup, base, comp, larg, ang, cor, veia):
+    ux, uy = math.cos(ang), math.sin(ang)
+    nx, ny = -uy, ux
+    pts = []
+    for i in range(7):
+        k = i / 6
+        w = math.sin(k * math.pi) * larg
+        pts.append((base[0] + ux * comp * k + nx * w, base[1] + uy * comp * k + ny * w))
+    for i in range(6, -1, -1):
+        k = i / 6
+        w = math.sin(k * math.pi) * larg * 0.7
+        pts.append((base[0] + ux * comp * k - nx * w, base[1] + uy * comp * k - ny * w))
+    pygame.draw.polygon(sup, cor, pts)
+    pygame.draw.polygon(sup, (16, 22, 14), pts, 1)
+    pygame.draw.line(sup, veia, base, (base[0] + ux * comp * 0.8, base[1] + uy * comp * 0.8))
+
+
+def _cabeca_planta_frente(sup, cx, cy, r, boca, t, runa):
+    """A CABEÇONA de planta carnívora OLHANDO PRA CÂMERA: bola roxa com a boca no meio (fechada = dentes
+    trançados; aberta = buraco escuro com dentes em cima e embaixo e a língua)."""
+    borda = (16, 22, 14)
+    for lado in (-1, 1):  # as folhinhas da gola (atrás da cabeça, aparecendo dos lados)
+        _folha_frente(sup, (cx + lado * (r - 2), cy - 1), r * 0.9, 2.2, math.pi / 2 + lado * 1.9 + math.pi,
+                      _cor_silv("g"), _cor_silv("G"))
+    pygame.draw.circle(sup, borda, (int(cx), int(cy)), int(r) + 1)
+    pygame.draw.circle(sup, _cor_silv("p"), (int(cx), int(cy)), int(r))
+    pygame.draw.ellipse(sup, _cor_silv("P"), (cx - r * 0.6, cy - r * 0.85, r * 1.2, r * 0.5))  # o brilho de cima
+    for ox, oy in ((-4, -5), (3, -6), (5, -3)):  # as pintinhas
+        sup.set_at((int(cx + ox), int(cy + oy)), _cor_silv("P"))
+    abre = int(round(boca * r * 0.9))
+    w = int(r * 1.5)
+    if abre >= 2:  # BOCA ABERTA: o buraco escuro, a língua e os dentes
+        pygame.draw.ellipse(sup, borda, (cx - w / 2 - 1, cy - abre / 2 - 1, w + 2, abre + 2))
+        pygame.draw.ellipse(sup, _cor_silv("q"), (cx - w / 2, cy - abre / 2, w, abre))
+        pygame.draw.ellipse(sup, _cor_silv("r"), (cx - w / 4, cy + abre / 2 - 3, w / 2, 3))
+        for i in range(5):
+            x = cx - w / 2 + 2 + i * (w - 4) / 4
+            pygame.draw.polygon(sup, _cor_silv("w"), [(x - 1, cy - abre / 2), (x + 1, cy - abre / 2), (x, cy - abre / 2 + 2)])
+            pygame.draw.polygon(sup, _cor_silv("w"), [(x - 1, cy + abre / 2), (x + 1, cy + abre / 2), (x, cy + abre / 2 - 2)])
+    else:  # FECHADA: a linha da boca com os dentes trançados
+        pygame.draw.line(sup, borda, (cx - w / 2, cy + 1), (cx + w / 2, cy + 1))
+        for i in range(6):
+            x = cx - w / 2 + 1 + i * (w - 2) / 5
+            sup.set_at((int(x), int(cy + (0 if i % 2 else 2))), _cor_silv("w"))
+    if runa:  # a RUNA na testa
+        cor = _cor_silv("y")
+        for ox, oy in ((0, -r + 3), (-1, -r + 4), (1, -r + 4), (0, -r + 5)):
+            sup.set_at((int(cx + ox), int(cy + oy)), cor)
+
+
+def _desenha_silvanus_frente(b, t, boca=0.0, recua=0.0, avanca=0.0, runa=False):
+    sup, borda = b.sup, (16, 22, 14)
+    bx, by = (int(v) for v in b.P((0, 0)))
+    # as RAÍZES espalhadas no chão (pros lados e vindo na direção da câmera)
+    for i, (dx, dy, larg) in enumerate(((-22, 1, 3), (22, 1, 3), (-15, 3, 3), (15, 3, 3), (-8, 4, 2), (8, 4, 2),
+                                        (-27, -1, 2), (27, -1, 2))):
+        ondula = math.sin(t * 0.06 + i) * 0.6
+        meio = (bx + dx * 0.5, by - 2 + ondula)
+        fim = (bx + dx, by + dy)
+        pygame.draw.lines(sup, borda, False, [(bx, by - 3), meio, fim], larg + 2)
+        pygame.draw.lines(sup, _cor_silv("T" if i % 3 == 0 else "t"), False, [(bx, by - 3), meio, fim], larg)
+    # as FOLHAS grandes da base
+    bal = math.sin(t * 0.1) * 0.1
+    for lado in (-1, 1):
+        _folha_frente(sup, (bx + lado * 3, by - 5), 19, 4.5, math.pi / 2 + lado * (1.25 + bal) + math.pi,
+                      _cor_silv("g" if lado < 0 else "d"), _cor_silv("G"))
+    # o BULBO (corpo curto e grosso)
+    pygame.draw.ellipse(sup, borda, (bx - 9, by - 23, 18, 21))
+    pygame.draw.ellipse(sup, _cor_silv("g"), (bx - 8, by - 22, 16, 19))
+    pygame.draw.ellipse(sup, _cor_silv("d"), (bx - 8, by - 20, 5, 15))
+    pygame.draw.line(sup, _cor_silv("G"), (bx + 4, by - 18), (bx + 5, by - 8))
+    for ox, oy in ((-3, -12), (2, -15), (0, -8)):  # as RUNAS
+        sup.set_at((bx + ox, by + oy), _cor_silv("y") if runa else _cor_silv("Y"))
+    for fx, fy in ((bx - 6, by - 18), (bx + 6, by - 12)):  # as florzinhas
+        for ox, oy in ((0, -1), (-1, 0), (1, 0), (0, 1)):
+            sup.set_at((int(fx + ox), int(fy + oy)), _cor_silv("f"))
+        sup.set_at((int(fx), int(fy)), _cor_silv("F"))
+    # o PESCOÇO: sobe fazendo um S e a cabeça cai pra FRENTE (na câmera)
+    topo = (bx + 6 * (1 - recua), by - 48 - 6 * recua)
+    cab = (bx + 2 * (1 - avanca), by - 40 - 6 * recua + 10 * avanca)
+    pts = [(bx, by - 21), (bx - 5, by - 32), (topo[0], topo[1]), (cab[0], cab[1] - 6)]
+    pygame.draw.lines(sup, borda, False, pts, 6)
+    pygame.draw.lines(sup, _cor_silv("g"), False, pts, 4)
+    pygame.draw.lines(sup, _cor_silv("G"), False, [(x - 1, y) for x, y in pts[:3]], 1)
+    r = 9 * (1 + 0.35 * avanca) * (1 - 0.1 * recua)  # (vindo na câmera = maior)
+    _cabeca_planta_frente(sup, cab[0], cab[1], r, boca, t, runa)
+    return cab, r
+
+
+def semente_voando(tela, x, y, esc, t=0):
+    """A SEMENTE cuspida vindo na câmera, em pixel art (pra cena): a sementinha marrom com o brotinho, girando."""
+    peq = pygame.Surface((9, 9), pygame.SRCALPHA)
+    pygame.draw.ellipse(peq, (16, 22, 14), (1, 2, 7, 7))
+    pygame.draw.ellipse(peq, (104, 82, 52), (2, 3, 5, 5))
+    peq.set_at((3, 4), (146, 116, 74))
+    pygame.draw.line(peq, (72, 150, 60), (4, 2), (5, 0))
+    peq.set_at((6, 0), (124, 200, 92))
+    peq = pygame.transform.rotate(peq, (t * 25) % 360 // 90 * 90)
+    img = pygame.transform.scale(peq, (round(9 * esc), round(9 * esc)))
+    tela.blit(img, (round(x - 4.5 * esc), round(y - 4.5 * esc)))
+
+
+def _silvanus(b, e, pose, t, f, prog=None):
+    k = None if pose != "ataque" else ((t % 60) / 60 if prog is None else max(0.0, min(1.0, prog)))
+    boca = recua = avanca = 0.0
+    if k is not None:
+        if k < 0.35:  # RECOLHE o pescoço (enche as bochechas)
+            recua = _suave_noct(k / 0.35)
+        elif k < 0.6:  # COSPE: a cabeça vem pra câmera de boca aberta
+            a = _suave_noct((k - 0.35) / 0.1)
+            recua, avanca, boca = 1 - a, a, 1.0
+        else:
+            a = _suave_noct((k - 0.6) / 0.4)
+            avanca, boca = 1 - a, max(0.0, 1 - a * 3)
+    cab, r = _desenha_silvanus_frente(b, t, boca, recua, avanca, runa=k is not None)
+
+    def unid(px):
+        return ((px[0] - b.ox) / b.k, (b.oy - px[1]) / b.k)
+    res = dict(olhos=unid(cab), mao=unid(cab), cabeca=unid(cab))
+    if k is not None:
+        res["soltou"] = k >= 0.45
+    return res
+
+
+LUTADORES.update({"SILVANUS": _silvanus})
+LARGO.update({"SILVANUS": 1.2})

@@ -204,12 +204,26 @@ def bote_efeito(l, tela):
 S_SAI, S_CORRE, S_VEL, S_FOGO = 6, 30, 11, 8
 
 
+def corrida_quadros():
+    """A CORRIDA de raptor: se abaixa e GALOPA (esticando e encolhendo), igual o Tromos. Pedido do Gomes: mais fluido."""
+    q = [(0, "parado"), (S_SAI - 2, "x_abaixa")]
+    t, k = S_SAI + 1, 0
+    while t < S_SAI + S_CORRE:
+        q.append((t, "x_galope_a" if k % 2 == 0 else "x_galope_b"))
+        t, k = t + 4, k + 1
+    return q + [(S_SAI + S_CORRE + 6, "x_levanta"), (S_SAI + S_CORRE + 14, "parado")]
+
+
 def corrida(l, outro, jogo):
     t = l.t
     m = l.memo
     if l.acertou and "bateu" not in m:
         m["bateu"] = t
         m["caixa"] = None
+        base = [q for q in GOLPES["magnus_corrida"]["quadros"] if q[0] < t]  # (a rabada de fogo: GIRA o corpo)
+        m["quadros"] = base + [(t + 2, "x_rabada_gira"), (t + S_FOGO - 1, "x_rabada_gira"), (t + S_FOGO + 1, "x_rabada"),
+                               (t + S_FOGO + 6, "x_rabada_fim"), (t + S_FOGO + 18, "x_rabada_fim"),
+                               (t + S_FOGO + 26, "parado")]
     if "bateu" in m:
         l.vx = 0
         u = t - m["bateu"]
@@ -338,16 +352,18 @@ GOLPES["magnus_rabada_alta"] = dict(dano=5, hit=24, defe=10, emp=2, nivel="medio
 _registra("magnus_rabadas", ini=Q_1, ativo=Q_2 + 5 - Q_1, rec=16, janelas=((Q_1, Q_1 + 5), (Q_2, Q_2 + 5)),
           caixa=(0, 0, 96, 34), dano=5, hit=18, defe=8, emp=2, nivel="medio", logica=rabadas, ia="perto",
           lanca_depois=True,
-          quadros=[(0, "parado"), (4, "x_rabada"), (Q_2 + 14, "x_rabada"), (Q_2 + 22, "parado")])
+          quadros=[(0, "parado"), (3, "x_rabada_gira"), (Q_1, "x_rabada"), (Q_1 + 5, "x_rabada_fim"),
+                   (Q_2 - 3, "x_rabada_gira"), (Q_2, "x_rabada"), (Q_2 + 6, "x_rabada_fim"), (Q_2 + 14, "x_rabada_fim"),
+                   (Q_2 + 22, "parado")])  # (as 2 rabadas com giro e continuação: pedido do Gomes, mais fluido)
 _registra("magnus_bote", ini=R_PULA, ativo=30, rec=0, janelas=((R_PULA, R_PULA + 30),), dano=2, hit=40, defe=12,
           emp=0, nivel="medio", logica=bote, efeito=bote_efeito, ia="medio",
-          quadros=[(0, "parado"), (R_PULA - 2, "x_rasteja"), (R_PULA + 2, "x_salto"), (R_PULA + 30, "x_salto")])
+          quadros=[(0, "parado"), (3, "x_abaixa"), (R_PULA - 2, "x_rasteja"), (R_PULA + 2, "x_salto"),
+                   (R_PULA + 30, "x_salto")])
 GOLPES["magnus_bote"]["total"] = 9999
 GOLPES["magnus_rabada_fogo"] = dict(dano=10, hit=30, defe=12, emp=2, nivel="medio", especial=True)
 _registra("magnus_corrida", base="agachado", ini=S_SAI, ativo=S_CORRE, rec=14, janelas=((S_SAI, S_SAI + S_CORRE),),
           caixa=(0, 0, 70, 64), dano=5, hit=24, defe=10, emp=0, nivel="medio", logica=corrida, ia="medio",
-          quadros=[(0, "parado"), (S_SAI - 2, "x_rasteja"), (S_SAI + S_CORRE, "x_rasteja"),
-                   (S_SAI + S_CORRE + 14, "parado")])
+          quadros=corrida_quadros())
 GOLPES["magnus_corrida"]["total"] = 9999
 _registra("magnus_bola", ini=0, ativo=1, rec=0, proj=True, raio=14, vel=10, dano=15, hit=30, defe=14, emp=3,
           nivel="medio", ultimate=True, ao_acertar=bola_acertou, desenho_proj=desenha_bola)

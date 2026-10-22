@@ -220,6 +220,8 @@ GOLPE_E = {  # o golpe do E de cada um, vindo na CÂMERA: (o que vem, o que acon
     "TROMOS": ("acido", "suja"), "TAI": ("onda", "treme"), "TAMER": ("lobo", "preto"),
     "JOHN": ("cartola", "racha"), "CRÁQUEN": ("ancora", "racha"), "MAGNUS": ("espinhos", "furos"),
     "SPHYRUS": ("ar", "treme"), "FRIGANTUS": ("neve", "suja"),
+    "INAZUMANEKO": ("crescente", "racha"), "NOCTURNUS": ("eco", "treme"),
+    "SILVANUS": ("semente", "racha"),
 }
 
 
@@ -426,7 +428,7 @@ def pov_fundo(c, q, t):
 
 
 FRENTE_POSE = {"parado": "parado", "pulo": "pulo", "agachado": "agachado", "especial": "ataque"}
-FRENTE_APROVADOS = {"KUN", "MAX-10", "RIB", "KING RIP", "CANNAN", "FINN", "TROMOS", "TAI", "TAMER", "JOHN", "CRÁQUEN", "MAGNUS", "SPHYRUS", "FRIGANTUS"}  # (os desenhos de frente refeitos pixel por pixel e APROVADOS pelo Gomes; os outros ficam de lado)
+FRENTE_APROVADOS = {"KUN", "MAX-10", "RIB", "KING RIP", "CANNAN", "FINN", "TROMOS", "TAI", "TAMER", "JOHN", "CRÁQUEN", "MAGNUS", "SPHYRUS", "FRIGANTUS", "INAZUMANEKO", "NOCTURNUS", "SILVANUS"}  # (os desenhos de frente refeitos pixel por pixel e APROVADOS pelo Gomes; os outros ficam de lado)
 
 
 def frente(c, q, nome_pose, x, y, t, prog=None):
@@ -571,6 +573,15 @@ def v3_ataca(c, q, t, k):
         elif tipo == "cartola" and pf:  # (de frente: a CARTOLA de pixel do John vem DE LADO, girando como disco)
             import frente as fr
             fr.cartola_voando(q, ox, oy, fr.UNID * ESC_FRENTE * (1 + 4 * u ** 2), t * 0.7, c.falso)
+        elif tipo == "crescente" and pf:  # (de frente: a MEIA-LUA do corte vertical, EM PÉ, crescendo e subindo)
+            import frente as fr
+            fr.crescente_voando(q, ox, oy - 30 * u, fr.UNID * ESC_FRENTE * (1 + 5 * u ** 2), t)
+        elif tipo == "eco" and pf:  # (de frente: a BOLA DE ECO do grito, anéis azuis de distorção crescendo até a câmera)
+            import frente as fr
+            fr.bola_eco_voando(q, ox, oy, fr.UNID * ESC_FRENTE * (1 + 5 * u ** 2), t)
+        elif tipo == "semente" and pf:  # (de frente: a SEMENTE cuspida, em pixel, girando e crescendo até a câmera)
+            import frente as fr
+            fr.semente_voando(q, ox, oy, fr.UNID * ESC_FRENTE * (1 + 5 * u ** 2), t)
         elif tipo == "neve" and pf:  # (de frente: a BOLA DE NEVE de pixel do Frigantus crescendo até a câmera)
             import frente as fr
             fr.bola_de_neve(q, ox, oy, fr.UNID * ESC_FRENTE * 1.05 * (1 + 5 * u ** 2), t)

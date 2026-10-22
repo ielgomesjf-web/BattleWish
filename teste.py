@@ -890,6 +890,17 @@ precisa = {"soco", "chute", "ag_chute",  # (os golpes do boneco de treino não c
            "rib_shuriken", "rib_bunshin", "rib_rasteira", "rib_kunai", "rib_ultimate",
            "trafo_lingua", "trafo_terra", "trafo_transforma", "trafo_pulo",
            "king_bumerangue", "king_chute", "king_giro", "king_salto"}
+for _g in sorted(precisa - golpes):  # (faltou algum? umas lutas a mais com o dono do golpe: o sorteio às vezes não usa)
+    _dono = next((f for f in PERSONAGENS if _g in f["golpes"].values()), None)
+    for _k in range(3 if _dono else 0):
+        p = Partida(_dono, PERSONAGENS[(_k + 3) % len(PERSONAGENS)], Computador("DIFÍCIL"), Computador("DIFÍCIL"))
+        for q in range(60 * 60 * 3):
+            p.passo(None)
+            golpes.add(p.L[0].nome_golpe)
+            if _g in golpes or p.fase == "fim":
+                break
+        if _g in golpes:
+            break
 checar(precisa <= golpes, f"o computador usa os golpes todos (faltou: {sorted(precisa - golpes)})")
 
 # =====================================================================
@@ -1612,7 +1623,7 @@ checar(oa.estado == ob.estado == "fim" and conferencia(oa.partida) == conferenci
        f"ONLINE: os dois jogos lutam a mesma luta até o fim ({oa.estado}, {ob.estado})")
 oa.voltar_menu()
 ob.voltar_menu()
-oa, ob = dois_robos("trio", ["cabecoes"])
+oa, ob = dois_robos("trio", ["cabecoes"], limite=300)  # (o trio é longo: com o PC ocupado, 120 s não davam)
 checar(oa.estado == ob.estado == "fim" and oa.partida.trio and ob.partida.regras == {"cabecoes"}
        and conferencia(oa.partida) == conferencia(ob.partida) and not (oa.dessinc or ob.dessinc),
        f"ONLINE TRIO: 3 x 3 com MODO MALUCO, igual nos dois PCs até o fim ({oa.estado}, {ob.estado})")
@@ -2354,7 +2365,7 @@ checar(p.fase == "ko", "TRIO: só perde quando os 3 caem")
 for _ in range(5):
     p.desenhar(tela)
 p = Partida(None, None, Computador("DIFÍCIL"), Computador("DIFÍCIL"), trio=(eq1, eq2))
-for _ in range(60 * 60 * 6):  # (até 3 rounds de 99 segundos)
+for _ in range(60 * 60 * 8):  # (até 3 rounds de 99 segundos, mais as entradas/falas/KO de cada round)
     p.passo(None)
     if p.fase == "fim":
         break
@@ -2901,7 +2912,7 @@ for _nome, _itens in _ex.CATALOGO["vitorias"].items():
             if _i % 20 == 0:
                 _pp.desenhar(tela)
         _n_vit += 1
-checar(_n_vit == 30, f"LOJA: as {_n_vit} poses de vitória novas rodam (repetindo) sem quebrar")
+checar(_n_vit == 31, f"LOJA: as {_n_vit} poses de vitória novas rodam (repetindo) sem quebrar")
 
 # ---- ENTRADAS DA LOJA (2 por lutador) ----
 _n_ent = 0
@@ -2917,7 +2928,7 @@ for _nome, _itens in _ex.CATALOGO["entradas"].items():
         _l = _pp.L[0]
         _ent_ok &= (_l.x, _l.y, _l.esconde, _l.angulo, _l.s) == (_l.extra["entrada_x"], CHAO, False, 0, _l.f["tam"])
         _n_ent += 1
-checar(_ent_ok and _n_ent == 30, f"LOJA: as {_n_ent} entradas novas rodam e terminam com ele no lugar")
+checar(_ent_ok and _n_ent == 31, f"LOJA: as {_n_ent} entradas novas rodam e terminam com ele no lugar")
 
 # =====================================================================
 # FRIGANTUS (o yeti gigantopiteco, 15º)
@@ -3053,7 +3064,7 @@ for _cat, _tipo in (("vitorias", "vitoria"), ("entradas", "entrada")):
                 _c.passo()
             _ok_c &= _c.acabou
             _n_c += 1
-checar(_ok_c and _n_c == 30, f"CUTSCENES: as {_n_c} cenas (15 vitórias + 15 entradas) rodam até o fim em até 6 s")
+checar(_ok_c and _n_c == 32, f"CUTSCENES: as {_n_c} cenas (16 vitórias + 16 entradas) rodam até o fim em até 6 s")
 import dis as _dis  # noqa: E402
 import entradas_loja as _el  # noqa: E402
 import vitorias_loja as _vl  # noqa: E402
@@ -3079,6 +3090,34 @@ checar(_pc2.cena_loja is None, "CUTSCENES: o computador (e o online) não têm c
 _m0 = _sv.moedas()
 checar(_ev.converter_sobras(datetime.date(2026, 11, 20)) == 5 and _sv.moedas() == _m0 + 5 and _ev.doces() == 0,
        "HALLOWEEN: depois do evento, os doces que sobraram viram moedas")
+
+# ---- ESQUIVA PERFEITA (v3.0): rolar no último instante deixa o OPONENTE em câmera lenta ----
+_king = next(f for f in PERSONAGENS if f["nome"] == "KING RIP")
+_tai = next(f for f in PERSONAGENS if f["nome"] == "TAI")
+
+
+def _esquiva(atraso):
+    """O TAI dá um chute; o KING rola (M1+M2 juntos) depois de 'atraso' quadros."""
+    pe = Partida(_king, _tai, Roteiro([Entrada()] * atraso + [Entrada(5, True, True)]), Roteiro([Entrada(5, False, True)]))
+    pe.fase, pe.tf = "luta", 0
+    pe.objetos.pronto, pe.objetos.recarga = False, 10 ** 9
+    pe.L[1].x = pe.L[0].x + 90
+    v = pe.L[0].vida
+    lentos, quadros_tai = 0, 0
+    for _ in range(40):
+        t0 = pe.L[1].t
+        pe.passo(None)
+        if pe.L[1].extra.get("lento", 0) > 0:
+            lentos += 1
+            quadros_tai += pe.L[1].t != t0
+    return pe, pe.L[0].vida < v, lentos, quadros_tai
+
+
+pe, apanhou, lentos, andou = _esquiva(4)
+checar(not apanhou and pe.esquiva_txt and lentos > 20 and andou <= lentos // 2 + 1,
+       f"ESQUIVA PERFEITA: rolou na hora, não leva nada e o oponente fica em câmera lenta ({lentos} quadros, andou {andou})")
+pe, apanhou, lentos, _ = _esquiva(12)
+checar(apanhou and lentos == 0, "ESQUIVA PERFEITA: rolou tarde demais, apanha (e ninguém fica lento)")
 
 # ---- EQUILÍBRIO: a FORÇA de cada lutador multiplica o dano dos golpes dele ----
 for _f in PERSONAGENS:

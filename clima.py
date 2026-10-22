@@ -60,6 +60,9 @@ EVENTOS = {
     "CERCADO DO DESERTO": ("AREIA", "TEMPESTADE DE AREIA!"),
     "PRAIA DA ILHA": ("ONDAS", "ONDAS GIGANTES!"),
     "MONTANHA NEVADA": ("NEVASCA", "NEVASCA!"),
+    "MONTE KARASUMA": ("VENTO", "VENTO DA MONTANHA!"),
+    "CAVERNA DOS MORCEGOS": ("REVOADA", "REVOADA DE MORCEGOS!"),
+    "FLORESTA ANTIGA": ("VENTO", "A FLORESTA ESTÁ SUSSURRANDO!"),
 }
 
 
@@ -124,8 +127,10 @@ class Clima:
         for q in self.particulas:
             q[0] += q[2]
             q[1] += q[3]
-            leve = (q[6] == 4 and self.tipo in ("VENTO", "AREIA")) or (q[6] == 7 and self.tipo == "SAPOS")
-            q[3] += 0.03 if leve else 0.0 if (q[6] == 9 and self.tipo == "NEVASCA") else 0.25  # (folha/sapo/neve devagar)
+            leve = (q[6] == 4 and self.tipo in ("VENTO", "AREIA")) or (q[6] == 7 and self.tipo == "SAPOS") \
+                or (q[6] == 11 and self.tipo == "REVOADA")
+            q[3] += (math.sin(self.t * 0.3 + q[0] * 0.01) * 0.3 if q[6] == 11 else 0.03) if leve else \
+                0.0 if (q[6] == 9 and self.tipo == "NEVASCA") else 0.25  # (folha/sapo/neve devagar; morcego voa ondulando)
             q[4] -= 1
         self.particulas = [q for q in self.particulas if q[4] > 0]
         if self.batida:
@@ -189,6 +194,12 @@ class Clima:
                 l.vy -= GRAVIDADE * 0.4 * self.forca
                 if self.k % 6 == 0:
                     self.particulas.append([l.x, l.y, random.uniform(-1, 1), 0.5, 22, (200, 160, 255), 3])
+
+    def passo_revoada(self, p):  # o BANDO de morcegos atravessando a caverna (só aparência: escurece)
+        if self.k % 4 == 0:
+            de = random.choice((-20, LARGURA + 20))
+            self.particulas.append([de, random.uniform(70, CHAO - 60), (1 if de < 0 else -1) * random.uniform(6, 10),
+                                    random.uniform(-0.8, 0.8), 160, (20, 14, 28), 11])
 
     def passo_vento(self, p):
         if self.k % 480 == 0:  # o vento vira
@@ -417,9 +428,9 @@ class Clima:
                 x = (i * 137 + t * 3) % (LARGURA + 60) - 30
                 y = (i * 89 + t * 15) % ALTURA
                 pygame.draw.line(tela, (170, 190, 230), (x, y), (x - inc, y + 16), 1)
-        if self.tipo in ("ESCURO", "APAGAO"):  # escuro com luz em volta dos lutadores
+        if self.tipo in ("ESCURO", "APAGAO", "REVOADA"):  # escuro com luz em volta dos lutadores
             escuro = pygame.Surface((LARGURA, ALTURA), pygame.SRCALPHA)
-            escuro.fill((0, 0, 12, int((150 if self.tipo == "ESCURO" else 120) * f)))
+            escuro.fill((0, 0, 12, int((150 if self.tipo == "ESCURO" else 100 if self.tipo == "REVOADA" else 120) * f)))
             if partida is not None:
                 for l in partida.L:
                     for r, a in ((130, 0), (100, 0)):
@@ -510,6 +521,13 @@ class Clima:
                 pygame.draw.circle(tela, q[5], (int(q[0]), int(q[1])), 3)
             elif self.tipo == "AREIA" and q[6] == 4:  # grão de areia voando
                 pygame.draw.line(tela, q[5], (int(q[0]), int(q[1])), (int(q[0] - q[2]), int(q[1])), 2)
+            elif self.tipo == "REVOADA" and q[6] == 11:  # MORCEGO voando (batendo as asas)
+                x, y = int(q[0]), int(q[1])
+                asa = 6 if (self.t // 3 + x) % 2 else -3
+                pygame.draw.polygon(tela, q[5], [(x - 14, y - asa), (x - 4, y - 2), (x, y + 3), (x + 4, y - 2), (x + 14, y - asa),
+                                                 (x + 6, y + 2), (x, y + 6), (x - 6, y + 2)])
+                pygame.draw.circle(tela, (255, 70, 70), (x - 2, y), 1)
+                pygame.draw.circle(tela, (255, 70, 70), (x + 2, y), 1)
             elif self.tipo == "VENTO" and q[6] == 4:  # folha voando
                 pygame.draw.ellipse(tela, q[5], (int(q[0]) - 6, int(q[1]) - 3, 12, 6))
             else:

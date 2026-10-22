@@ -45,6 +45,19 @@ POSES_TAMER = {
                     ct=(-10, 104), mt=(-16, 124), cf=(14, 104), mf=(22, 124)),
     "t_carinho": dict(pt=(-20, 0), jt=(-4, 20), pf=(20, 0), jf=(30, 20), qd=(0, 34), pc=(14, 62), cb=(22, 76),
                       ct=(8, 48), mt=(18, 34), cf=(-6, 50), mf=(-30, 36)),
+    # (as poses do meio: deixam os golpes FLUIDOS — pedido do Gomes)
+    "t_assobia": dict(pt=(-24, 0), jt=(-14, 26), pf=(22, 0), jf=(26, 28), qd=(0, 50), pc=(4, 86), cb=(8, 104),
+                      ct=(-6, 70), mt=(2, 84), cf=(14, 92), mf=(10, 100)),
+    "t_aponta_firme": dict(pt=(-26, 0), jt=(-16, 26), pf=(26, 0), jf=(30, 26), qd=(0, 48), pc=(10, 84), cb=(14, 102),
+                           ct=(-10, 70), mt=(-16, 56), cf=(30, 90), mf=(58, 94)),
+    "t_chute_prep": dict(pt=(-16, 0), jt=(-10, 28), pf=(22, 30), jf=(26, 50), qd=(0, 54), pc=(-4, 88), cb=(-6, 104),
+                         ct=(-18, 72), mt=(-24, 60), cf=(4, 76), mf=(-2, 62)),
+    "t_chute_volta": dict(pt=(-16, 0), jt=(-10, 28), pf=(30, 36), jf=(30, 52), qd=(0, 54), pc=(-6, 88), cb=(-8, 104),
+                          ct=(-20, 72), mt=(-28, 60), cf=(0, 74), mf=(-6, 60)),
+    "t_monta_pula": dict(pt=(-20, 10), jt=(-8, 30), pf=(10, 20), jf=(16, 38), qd=(0, 56), pc=(8, 90), cb=(14, 106),
+                         ct=(14, 96), mt=(26, 106), cf=(20, 96), mf=(34, 104)),
+    "t_monta2": dict(pt=(18, 4), jt=(24, 26), pf=(-10, 4), jf=(-4, 26), qd=(0, 40), pc=(18, 72), cb=(28, 86),
+                     ct=(28, 64), mt=(42, 56), cf=(32, 66), mf=(46, 60)),
 }
 proporcionar(POSES_TAMER)
 
@@ -408,6 +421,17 @@ def alcateia_efeito(l, tela):
 # =====================================================================
 # Golpes
 # =====================================================================
+def galope_quadros():
+    """Pula pra montar e SACODE no ritmo do galope (pedido do Gomes: mais fluido)."""
+    q = [(0, "parado"), (3, "t_monta_pula"), (S_MONTA - 2, "t_monta")]
+    t, k = S_MONTA + 3, 0
+    while t < S_FIM:
+        q.append((t, "t_monta2" if k % 2 == 0 else "t_monta"))
+        t, k = t + 5, k + 1
+    q += [(S_FIM + 2, "t_monta"), (S_FIM + 12, "parado")]
+    return q
+
+
 def _registra(nome, **g):
     g.setdefault("base", "parado")
     g.setdefault("pose", "parado")
@@ -419,10 +443,12 @@ def _registra(nome, **g):
 
 _registra("tamer_lobo", ini=E_SAI, ativo=E_FIM - E_SAI - 8, rec=8, janelas=((E_SAI + 2, E_FIM - 8),), dano=15, hit=18,
           defe=10, emp=4, nivel="medio", logica=lobo_avanca, ia="medio",
-          quadros=[(0, "parado"), (4, "t_aponta"), (E_FIM - 10, "t_aponta"), (E_FIM, "parado")])
+          quadros=[(0, "parado"), (3, "t_assobia"), (6, "t_assobia"), (9, "t_aponta"), (14, "t_aponta_firme"),
+                   (E_FIM - 10, "t_aponta_firme"), (E_FIM, "parado")])
 _registra("tamer_chute", ini=8, ativo=5, rec=20, caixa=(20, 40, 92, 104), dano=15, hit=24, defe=12, emp=3,
           nivel="medio", derruba=True, voo=(17, 1.5), parede=5, parede_sobe=True, ia="perto", som="vento",
-          quadros=[(0, "parado"), (6, "t_chute"), (16, "t_chute"), (33, "parado")])
+          quadros=[(0, "parado"), (5, "t_chute_prep"), (9, "t_chute"), (16, "t_chute"), (21, "t_chute_volta"),
+                   (33, "parado")])
 _registra("tamer_combo", ini=R_INI, ativo=R_HITS * R_INTERVALO, rec=12,
           janelas=tuple((R_INI + k * R_INTERVALO, R_INI + k * R_INTERVALO + 3) for k in range(R_HITS)),
           caixa=(10, 20, 92, 112), dano=3, hit=10, defe=7, emp=1, nivel="medio", logica=combo_dupla, ia="perto",
@@ -430,7 +456,7 @@ _registra("tamer_combo", ini=R_INI, ativo=R_HITS * R_INTERVALO, rec=12,
 _registra("tamer_galope", ini=S_MONTA, ativo=S_FIM - S_MONTA, rec=12, janelas=((S_MONTA + 2, S_FIM),),
           caixa=(0, 0, 80, 110), dano=10, hit=22, defe=12, emp=7, nivel="medio", derruba=True, voo=(8, 8),
           logica=galope, ia="medio", som="vento",
-          quadros=[(0, "parado"), (S_MONTA - 2, "t_monta"), (S_FIM + 2, "t_monta"), (S_FIM + 12, "parado")])
+          quadros=galope_quadros())
 _registra("tamer_ultimate", ini=1, ativo=1, rec=0, dano=0, hit=0, defe=0, emp=0, nivel="medio", ultimate=True,
           logica=alcateia, efeito=alcateia_efeito, ia="ultimate",
           quadros=[(0, "parado"), (8, "t_grito"), (U_UIVO + 10, "t_grito"), (U_UIVO + 20, "parado")])

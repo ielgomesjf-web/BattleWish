@@ -353,6 +353,78 @@ def _boia(tela, x, y, giro):
     pygame.draw.circle(tela, (60, 30, 30), (int(x), int(y)), 13, 2)
 
 
+def _cristal(tela, x, t, usado, treme=0):
+    """CAVERNA DOS MORCEGOS (casa do NOCTURNUS): o CRISTAL ROXO gigante (bateu: estoura numa onda de som)."""
+    x += treme
+    if usado:
+        for k in range(3):  # (sobraram só os tocos quebrados)
+            pygame.draw.polygon(tela, (90, 50, 130), [(x - 20 + k * 16, CHAO), (x - 12 + k * 16, CHAO - 18), (x - 6 + k * 16, CHAO)])
+        return
+    brilha = 120 + int(60 * math.sin(t * 0.08))
+    camada = pygame.Surface((160, 160), pygame.SRCALPHA)
+    pygame.draw.circle(camada, (180, 100, 255, brilha // 3), (80, 80), 70)
+    tela.blit(camada, (x - 80, CHAO - 150))
+    for k, (dx, h, a) in enumerate(((-18, 80, -0.25), (0, 130, 0.0), (20, 96, 0.22), (-34, 50, -0.5), (34, 56, 0.5))):
+        bx = x + dx
+        c, s = math.cos(a), math.sin(a)
+        pts = [(bx - 10, CHAO), (bx - 10 + s * h * 0.8, CHAO - c * h * 0.8), (bx + s * h, CHAO - c * h),
+               (bx + 10 + s * h * 0.8, CHAO - c * h * 0.8), (bx + 10, CHAO)]
+        pygame.draw.polygon(tela, (30, 16, 46), [(px, py + 2) for px, py in pts])
+        pygame.draw.polygon(tela, (130, 66, 200), pts)
+        pygame.draw.polygon(tela, (210, 170, 255), [pts[1], pts[2], ((pts[1][0] + pts[2][0]) / 2 + 4, CHAO - c * h * 0.4)])
+
+
+def _pedra_runa(tela, x, t, usado, deitado=None):
+    """FLORESTA ANTIGA (casa do SILVANUS): a PEDRA RÚNICA redonda com musgo (bateu: sai rolando, a runa acesa)."""
+    if usado and deitado is None:
+        return
+    acesa = (140, 240, 160) if (t // 30) % 2 else (110, 210, 130)
+    if deitado is not None:  # rolando: a roda de pedra girando
+        y = CHAO - 26
+        pygame.draw.circle(tela, (88, 92, 80), (int(x), int(y)), 27)
+        pygame.draw.circle(tela, (128, 132, 116), (int(x), int(y)), 23)
+        for k in range(3):
+            a = deitado + k * 2.1
+            pygame.draw.line(tela, acesa, (x, y), (x + math.cos(a) * 16, y + math.sin(a) * 16), 3)
+        return
+    # em pé: a pedra em cima de uma base, com musgo e a runa brilhando
+    pygame.draw.rect(tela, (88, 92, 80), (x - 30, CHAO - 12, 60, 12), border_radius=3)
+    pygame.draw.circle(tela, (88, 92, 80), (int(x), CHAO - 38), 27)
+    pygame.draw.circle(tela, (128, 132, 116), (int(x), CHAO - 38), 23)
+    pygame.draw.ellipse(tela, (70, 120, 52), (x - 22, CHAO - 66, 34, 12))
+    pygame.draw.line(tela, acesa, (x, CHAO - 50), (x, CHAO - 26), 3)
+    pygame.draw.line(tela, acesa, (x, CHAO - 42), (x + 8, CHAO - 50), 3)
+    pygame.draw.line(tela, acesa, (x, CHAO - 36), (x - 8, CHAO - 44), 3)
+
+
+def _boneco_palha(tela, x, t, usado, deitado=None):
+    """MONTE KARASUMA (casa do INAZUMANEKO): o BONECO DE PALHA de treino (tomba e sai rolando)."""
+    palha, palha_esc, corda, borda = (214, 182, 100), (160, 124, 60), (120, 60, 40), (60, 40, 20)
+    if usado and deitado is None:
+        pygame.draw.line(tela, (90, 60, 30), (x, CHAO), (x, CHAO - 30), 6)  # (sobrou só o toco do poste)
+        return
+    if deitado is not None:  # rolando (a palha enrolada vista de lado, girando)
+        y = CHAO - 24
+        pygame.draw.circle(tela, borda, (int(x), int(y)), 26)
+        pygame.draw.circle(tela, palha, (int(x), int(y)), 23)
+        for k in range(4):
+            a = deitado + k * math.pi / 4
+            pygame.draw.line(tela, palha_esc, (x - math.cos(a) * 22, y - math.sin(a) * 22), (x + math.cos(a) * 22, y + math.sin(a) * 22), 2)
+        pygame.draw.circle(tela, corda, (int(x), int(y)), 23, 3)
+        return
+    pygame.draw.line(tela, (90, 60, 30), (x, CHAO), (x, CHAO - 150), 6)  # o poste
+    corpo = pygame.Rect(x - 20, CHAO - 130, 40, 96)
+    pygame.draw.rect(tela, borda, corpo.inflate(4, 4), border_radius=10)
+    pygame.draw.rect(tela, palha, corpo, border_radius=10)
+    for k in range(3):  # as amarras
+        yy = corpo.y + 18 + k * 28
+        pygame.draw.line(tela, corda, (corpo.x, yy), (corpo.right, yy), 4)
+    for k in range(6):  # os fiapos de palha
+        pygame.draw.line(tela, palha_esc, (corpo.x + 6 + k * 6, corpo.y + 4), (corpo.x + 4 + k * 6, corpo.bottom - 4), 1)
+    pygame.draw.line(tela, borda, (corpo.x - 2, corpo.y + 30), (corpo.right + 2, corpo.y + 56), 2)  # um corte de espada
+    pygame.draw.rect(tela, (90, 60, 30), (x - 26, CHAO - 104, 52, 6))  # os "braços" (a trave)
+
+
 def _placa_avalanche(tela, x, t, usado):
     """MONTANHA NEVADA (casa do FRIGANTUS): a placa de PERIGO: AVALANCHE, com neve em cima."""
     pygame.draw.rect(tela, (110, 80, 50), (x - 5, CHAO - 130, 10, 130))           # o poste
@@ -418,6 +490,11 @@ CONFIG = {
     "MONTANHA NEVADA": dict(nome="PLACA DE AVALANCHE", x=790, tipo="CAI", desenho=_placa_avalanche, golpe=CAINDO,
                             caindo=lambda tela, x, y, t: _bolada_neve(tela, x, y), som="vento", ja_no_alto=True,
                             altura=-60, dx_alto=0, cor_quebra=(240, 245, 255)),  # (a neve cai lá de cima: só a sombra avisa)
+    "CAVERNA DOS MORCEGOS": dict(nome="CRISTAL ROXO", x=180, tipo="ONDA", desenho=_cristal, golpe=ONDA,
+                                 cor=(200, 140, 255), som="laser"),
+    "FLORESTA ANTIGA": dict(nome="PEDRA RÚNICA", x=205, tipo="ROLA", desenho=_pedra_runa, golpe=ROLANDO, som="terra"),
+    "MONTE KARASUMA": dict(nome="BONECO DE PALHA", x=800, tipo="ROLA", desenho=_boneco_palha, golpe=ROLANDO,
+                           som="terra"),
     "VILA DOS SAPOS": dict(nome="BALDE DE LAMA", x=190, tipo="CHAO", desenho=_balde_lama, golpe=ESCORREGA,
                            cor=(120, 84, 44), som="puf"),
 }

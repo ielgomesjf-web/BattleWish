@@ -245,6 +245,7 @@ class Lutador:
 
     # ------------------------------------------------------------ a cada quadro
     def update(self, e, outro, jogo):
+        e = hab.trocar_controles(self, e)  # CONTROLES TROCADOS (Bola de Eco do Nocturnus)
         self.entrada_atual = e
         lento = hab.mult_ataque(self)
         if lento < 1 and self.estado == "ataque":  # ATAQUE MAIS LENTO (Fúria do Sumô): o golpe fica 1 quadro parado
@@ -533,6 +534,7 @@ class Lutador:
         self.mudar("rolando")
         self.rola_lado = self.dir if pra_frente else -self.dir
         self.inv = max(self.inv, ROLA_INV)
+        self.extra.pop("esq_perfeita", None)  # (cada rolamento pode dar UMA esquiva perfeita)
         self.rolou = getattr(self, "rolou", 0) + 1
         som.tocar("vento", 0.4)
 
@@ -670,6 +672,8 @@ class Lutador:
                         self.pose_vista = misturar(self.pose_vista, self.poses["pouso"], 0.6)
                 elif self.estado == "voando" and self.quica:  # bateu no chão e QUICA (dá pra continuar o combo)
                     self.quica = False
+                    if hasattr(jogo, "destruicao"):
+                        jogo.destruicao().chao(self.x, 0.4, jogo.t_total)
                     self.vy = -8.5
                     self.y = CHAO - 1
                     self.vx *= 0.4
@@ -678,6 +682,8 @@ class Lutador:
                     jogo.parada = max(jogo.parada, 4)
                 elif self.estado == "voando":
                     som.tocar("queda")
+                    if hasattr(jogo, "destruicao"):  # CENÁRIO QUE QUEBRA: caiu forte, racha o chão ali
+                        jogo.destruicao().chao(self.x, 1.0 if self.voo_forte else 0.4, jogo.t_total)
                     self.mudar("caido")
                     self.malabar, self.malabar_n, self.quica = False, 0, False
                     self.vx = 0
@@ -694,6 +700,9 @@ class Lutador:
             if self.estado == "voando" and hasattr(jogo, "transicao_parede") and jogo.transicao_parede(self, lado):
                 return  # atravessou a parede: TRANSIÇÃO DE CENÁRIO!
             if self.estado == "voando" and self.bonus_parede:  # jogado na parede: dói mais!
+                if hasattr(jogo, "destruicao"):  # CENÁRIO QUE QUEBRA: racha a parede onde ele bateu
+                    forca = 1.0 if self.voo_forte else min(1.0, 0.4 + self.bonus_parede / 12)
+                    jogo.destruicao().parede(lado, self.y - 60 * self.s, forca, jogo.t_total)
                 self.vida = max(0, self.vida - self.bonus_parede)
                 self.bonus_parede = 0
                 self.vx = -self.vx * 0.35
@@ -1123,6 +1132,7 @@ class Lutador:
     def efeito_habilidade(self):
         """Tem algum desenho de habilidade aparecendo agora? (ás, fumaça do Maquinário, brilhos)"""
         return (hab.bonus_causa(self) or getattr(self, "flash_invisivel", 0) > 0 or bool(self.extra.get("pocas"))
+                or bool(self.extra.get("tela_toda"))  # (efeito longe dele: armadilhas do Silvanus, nuvem do Nocturnus)
                 or getattr(self, "flash_ex", 0) > 0 or getattr(self, "flash_escape", 0) > 0
                 or self.extra.get("lobo_flash", 0) > 0
                 or (self.ex and self.estado == "ataque")

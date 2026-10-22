@@ -59,6 +59,8 @@ class Partida:
         self.clima = clima.criar(self.cena.nome)      # CLIMA (v2.0): o cenário muda no meio da luta (do round 2)
         self.impactos = Impactos()
         self.t_total = 0
+        import estilo
+        self.estilos = [estilo.Estilo(), estilo.Estilo()]  # RANKING DE ESTILO (v3.0): um por LADO, a luta inteira
         self.novo_round()
 
     def novo_round(self):
@@ -102,6 +104,7 @@ class Partida:
         self.cinema = 0.0                              # faixas pretas de cinema (0 a 1)
         self.quebra_txt = None  # (lado, quadros) "GUARDA QUEBRADA!"
         self.parry_txt = None   # (lado, quadros) "PARRY!"
+        self.esquiva_txt = None  # (lado, quadros) "ESQUIVA PERFEITA!"
         self.choque = None      # CHOQUE (v2.0): os dois apertando botão rápido
         self.choque_txt = None  # (texto, quem venceu ou None, quadros)
 
@@ -175,6 +178,9 @@ class Partida:
         if self.parry_txt:
             lado, q = self.parry_txt
             self.parry_txt = (lado, q - 1) if q > 1 else None
+        if self.esquiva_txt:
+            lado, q = self.esquiva_txt
+            self.esquiva_txt = (lado, q - 1) if q > 1 else None
 
         if self.fase == "entrada":
             self.passo_entrada()
@@ -221,7 +227,20 @@ class Partida:
         ents = [Entrada(), Entrada()]
         if self.fase == "luta":
             ents = [self.ctrl[i].ler(bruto, self.L[i], self.L[1 - i], self) for i in (0, 1)]
+            for e in self.estilos:
+                e.passo(self.t_total)
         for i in (0, 1):
+            lento = self.L[i].extra.get("lento", 0)
+            if lento > 0:  # ESQUIVA PERFEITA: em câmera lenta (anda 1 quadro sim, 1 não; o botão apertado espera)
+                self.L[i].extra["lento"] = lento - 1
+                guardada = self.L[i].extra.pop("ent_guardada", None)
+                if lento % 2:
+                    e = ents[i]
+                    if e.soco or e.chute or e.especial or e.provoca:
+                        self.L[i].extra["ent_guardada"] = e
+                    continue
+                if guardada and not (ents[i].soco or ents[i].chute or ents[i].especial):
+                    ents[i] = guardada
             self.L[i].update(ents[i], self.L[1 - i], self)
             if self.L[i].pediu_ultimate:  # momento épico: tudo para e a tela escurece
                 self.L[i].pediu_ultimate = False
@@ -642,6 +661,23 @@ class Partida:
                 txt = f"{controle_video.nome('troca')} troca"
                 texto(tela, txt, 12, (150, 220, 255), (34 + 60 if i == 0 else LARGURA - 34 - 60, 142))
 
+    def destruicao(self):
+        """CENÁRIO QUE QUEBRA (v3.0): as marcas deste cenário (continuam de um round pro outro; trocou de cenário =
+        começa inteiro de novo). Quem bate na parede ou cai forte no chão racha ali (só desenho)."""
+        import destruicao
+        if getattr(self, "_destr_de", None) != self.cena.nome:
+            self._destr, self._destr_de = destruicao.Destruicao(self.cena.nome), self.cena.nome
+        return self._destr
+
+    def estilo_hit(self, atacante, alvo, nome):
+        """RANKING DE ESTILO: quem bateu sobe (variando os golpes), quem apanhou desce. (Roda nos 2 PCs: sem sorteio.)"""
+        if self.fase != "luta" or self.treino:
+            return
+        if atacante in self.L and nome:
+            self.estilos[self.L.index(atacante)].acertou(nome, self.t_total)
+        if alvo in self.L:
+            self.estilos[self.L.index(alvo)].apanhou()
+
     def registrar_hit(self, atacante, nome, ativacao):
         """O jogador (lado 0) acertou alguém com esse golpe (desafios de combo, estatísticas e missões)."""
         if atacante is self.L[0] and nome:
@@ -794,6 +830,9 @@ class Partida:
             itens.append(("COMBO MÁXIMO", MOEDAS_COMBO))
         if self.ultima_arcade and venceu:
             itens.append(("ARCADE COMPLETO", MOEDAS_ARCADE))
+        bonus, rotulo = self.estilos[0].moedas_bonus()  # RANKING DE ESTILO: a maior letra que ele alcançou
+        if bonus > 0:
+            itens.append((rotulo, bonus))
         if self.sobrevivencia is not None and not venceu and save.novo_recorde(self.sobrevivencia):
             itens.append(("RECORDE NOVO", MOEDAS_RECORDE))
         nivel = self.ctrl[1].nivel
@@ -856,8 +895,32 @@ class Partida:
         self.choque = choque.Choque(self, ((pa[0] + pb[0]) / 2, (pa[1] + pb[1]) / 2))
         return True
 
+    def corpo_esquivando(self, b):
+        """Rolando bem no comecinho (invencível): onde o golpe IA pegar (pra ESQUIVA PERFEITA), ou None."""
+        if b.estado != "rolando" or b.t > ESQ_JANELA or b.extra.get("esq_perfeita"):
+            return None
+        inv, b.inv = b.inv, 0
+        c = b.corpo()
+        b.inv = inv
+        return c
+
+    def esquiva_perfeita(self, b, a):
+        """ESQUIVA PERFEITA (v3.0): rolou no último instante. O tempo fica lento SÓ pro oponente (~1 s)."""
+        b.extra["esq_perfeita"] = True
+        a.extra["lento"] = ESQ_LENTO
+        a.extra.pop("ent_guardada", None)
+        self.esquiva_txt = (self.L.index(b) if b in self.L else 0, 70)
+        som.tocar("parry", 0.6)
+        som.tocar("vento", 0.7)
+        if b is self.L[0]:
+            self.stats["esquivas"] = self.stats.get("esquivas", 0) + 1
+
     def checar_golpe(self, a, b):
         cb = b.corpo()
+        if not cb and a.estado == "ataque" and not a.acertou:
+            quase = self.corpo_esquivando(b)
+            if quase and a.contato(quase):
+                self.esquiva_perfeita(b, a)
         ponto = a.contato(cb) if cb else None
         if not ponto:
             return
@@ -870,6 +933,8 @@ class Partida:
         res = b.receber(g, sinal, a, a.f["forca"])
         if res == "esquiva":  # (substituição: não aconteceu nada)
             return
+        if res == "hit":
+            self.estilo_hit(a, b, a.nome_golpe)
         if res == "hit" and b is self.L[1]:
             self.golpes_treino += 1
             self.registrar_hit(a, a.nome_golpe, getattr(a, "golpe_id", 0))
@@ -953,6 +1018,10 @@ class Partida:
                 continue
             alvo = self.L[1] if p.dono is self.L[0] else self.L[0]
             c = alvo.corpo()
+            if not c:
+                quase = self.corpo_esquivando(alvo)
+                if quase and p.rect().colliderect(quase) and getattr(p, "pode_acertar", True):
+                    self.esquiva_perfeita(alvo, p.dono)
             if c and p.rect().colliderect(c) and getattr(p, "pode_acertar", True):
                 if p.golpe.get("bumerangue"):
                     p.pode_acertar = False  # bate e continua (acerta de novo na volta)
@@ -963,6 +1032,8 @@ class Partida:
                 if res == "esquiva":  # (substituição: o projétil pegou no tronco e some)
                     p.vivo = False
                     continue
+                if res == "hit":
+                    self.estilo_hit(p.dono, alvo, getattr(p, "nome_golpe", None) or "tiro")
                 if res == "hit" and alvo is self.L[1]:
                     self.golpes_treino += 1
                     self.registrar_hit(p.dono, getattr(p, "nome_golpe", None), ("proj", getattr(p, "ativacao", 0)))
@@ -1107,6 +1178,7 @@ class Partida:
         baixo = self.cena.desenhar_pequeno(self.t_total, PIXEL)
         per = self.periodo_atual()
         per.pintar_fundo(baixo, self.t_total)  # DIA E NOITE (só desenho)
+        self.destruicao().desenhar(baixo, self.t_total, PIXEL)  # CENÁRIO QUE QUEBRA: rachaduras, buracos, entulho
         camada.fill((0, 0, 0, 0))
 
         tela_toda = pygame.Rect(0, 0, LARGURA, ALTURA)
@@ -1136,7 +1208,17 @@ class Partida:
             x1 = min(LARGURA, -(-r.right // PIXEL) * PIXEL)
             y1 = min(ALTURA, -(-r.bottom // PIXEL) * PIXEL)
             r = pygame.Rect(x0, y0, x1 - x0, y1 - y0)
-            peq = pygame.transform.smoothscale(camada.subsurface(r), (r.w // PIXEL, r.h // PIXEL))
+            if contorno or not EFEITOS_DUROS:
+                peq = pygame.transform.smoothscale(camada.subsurface(r), (r.w // PIXEL, r.h // PIXEL))
+            else:  # os EFEITOS em pixel art de verdade: cada bloquinho pega uma cor só (borda dura, sem borrão)...
+                peq = pygame.transform.scale(camada.subsurface(r), (r.w // PIXEL, r.h // PIXEL))
+                try:  # ...e o brilho em DEGRAUS (4 níveis de transparência), igual pixel art, em vez de degradê liso
+                    import numpy
+                    alfa = pygame.surfarray.pixels_alpha(peq)
+                    alfa[:] = numpy.where(alfa < 40, 0, (alfa.astype(numpy.uint16) + 42) // 85 * 85).clip(0, 255)
+                    del alfa
+                except ImportError:
+                    pass
             pos = (x0 // PIXEL, y0 // PIXEL)
             if contorno:
                 mascara = pygame.mask.from_surface(peq, 90)
@@ -1203,7 +1285,7 @@ class Partida:
                 passa(False, tela_toda)
             elif (l.estado == "ataque" and l.golpe and l.golpe.get("efeito")) or l.estado == "tonto"                     or l.efeito_habilidade():
                 passa(False, tela_toda if l.feixe or l.y < -200 or l.estado == "ataque" or l.extra.get("pocas")
-                      or ult2.vivo(l) else area([l]))
+                      or l.extra.get("tela_toda") or ult2.vivo(l) else area([l]))
         # efeitos por cima (sem contorno)
         for p in self.projeteis:
             p.desenhar(camada)
@@ -1243,6 +1325,9 @@ class Partida:
         if en and zoom <= 1.01:
             en.desenhar_frente(tela, self.t_total)  # (morcegos, fantasminha, neblina)
         ult2.desenhar_escuro(self, tela)  # CAÇADA NO ESCURO (Tromos): cada PC desenha o seu escuro
+        for i, l in enumerate(self.L):  # EFEITOS DE TELA (Nocturnus: cego, enjoo, os Zzz do sono)
+            if l.f.get("efeito_tela"):
+                l.f["efeito_tela"](l, self.L[1 - i], tela, self)
         if self.cinema > 0.02:  # faixas pretas de cinema
             faixa = int(62 * self.cinema)
             tela.fill(PRETO, (0, 0, LARGURA, faixa))
@@ -1378,6 +1463,12 @@ class Partida:
             pygame.draw.circle(tela, AMARELO, (cx, cy), 6 + armado // 5, 2)
 
     def hud(self, tela):
+        lento = max(l.extra.get("lento", 0) for l in self.L)
+        if lento > 0:  # ESQUIVA PERFEITA: o mundo fica azulado enquanto o oponente está em câmera lenta
+            if not hasattr(self, "_tinta_lenta"):
+                self._tinta_lenta = pygame.Surface((LARGURA, ALTURA), pygame.SRCALPHA)
+            self._tinta_lenta.fill((90, 200, 255, int(46 * min(1, lento / 12))))
+            tela.blit(self._tinta_lenta, (0, 0))
         if getattr(self, "meia", None):  # NATAL: "MEIA DE NATAL! 5/17" / "GORRINHO LIBERADO!"
             self.meia.desenhar_aviso(tela)
         if self.trio:
@@ -1390,6 +1481,11 @@ class Partida:
                 l.vida_vista = max(l.vida, l.vida_vista - 0.6)
             self.barra_vida(tela, i, l)
             self.barra_ultimate(tela, i, l)
+        import musica  # o RADINHO tocando a música (pequenininho, embaixo do nome do jogador 1)
+        musica.desenhar_radio(tela, 36, 104, musica.nome_de(som.MUSICA_LUTA), self.t_total, 2)
+        if not self.treino:  # o RANKING DE ESTILO (a letra) de cada lado
+            self.estilos[0].desenhar(tela, 90, 158, self.t_total, 1)
+            self.estilos[1].desenhar(tela, LARGURA - 90, 158, self.t_total, -1)
         # relógio
         pygame.draw.rect(tela, (20, 14, 24), (LARGURA // 2 - 38, 14, 76, 56), border_radius=10)
         pygame.draw.rect(tela, (240, 200, 110), (LARGURA // 2 - 38, 14, 76, 56), 3, border_radius=10)
@@ -1427,6 +1523,11 @@ class Partida:
             esc = 1 + max(0, (q - 70) / 10) * 0.6
             x = LARGURA // 2 if quem is None else (190 if quem == 0 else LARGURA - 190)
             texto_grande(tela, txt, 30, (255, 230, 90), (x, 150), esc, contorno=(60, 20, 0))
+        if self.esquiva_txt:
+            lado, q = self.esquiva_txt
+            esc = 1 + max(0, (q - 60) / 10) * 0.6
+            texto_grande(tela, "ESQUIVA PERFEITA!", 30, (180, 255, 230), (190 if lado == 0 else LARGURA - 190, 120), esc,
+                         contorno=(10, 50, 40))
         if self.parry_txt:
             lado, q = self.parry_txt
             esc = 1 + max(0, (q - 50) / 10) * 0.6

@@ -451,6 +451,8 @@ def _voz(nome, txt):
         return "*GROOOAR!*"
     if nome == "FRIGANTUS":
         return "*GRUUUAAH!*"
+    if nome == "NOCTURNUS":
+        return "*IIIIII!*"
     if nome == "RIBBAT":
         return "Ribbit."
     if nome == "TRAFO":
@@ -835,3 +837,253 @@ ESPELHO_PROPRIO[_F] = [[(0, "*UH-UH-UH!*"), (1, "*UH-UH-UH!!*")],
                        [(0, "*fuuuuh...*"), (1, "*GRUUUAAH!*")]]
 RIBBAT_PROPRIO[_F] = [("*fuuuuh...*", "...Ribbit."), ("*GRUUUAAH!*", "RIBBIT!")]
 FRASES[_F] = "*UH-UH-UH!*"
+
+
+# INAZUMANEKO, o tigre samurai (personagem 16, v3.0, do Gomes): fala pouco, calmo e honrado, como mestre de espada
+_I = "INAZUMANEKO"
+_INAZUMANEKO = {
+    "MAX-10": [
+        [("MAX-10", "FELINO COM ARMADURA DETECTADO. AMEAÇA: ALTA."), (_I, "Sua armadura é de aço. A minha, de honra.")],
+        [(_I, "Sua lâmina é um raio de luz. A minha é de verdade."), ("MAX-10", "COMPARANDO LÂMINAS... ERRO.")],
+        [("MAX-10", "ANALISANDO ESPADA... AFIAÇÃO: PERIGOSA."), (_I, "Então não fique na frente dela.")]],
+    "TRAFO": [
+        [("TRAFO", "Grrr... um gato? Eu caço gatos!"), (_I, "Hoje, o gato é quem caça.")],
+        [(_I, "Você muda de forma. Eu nunca mudo de caminho."), ("TRAFO", "AUUU! Vamos ver se o caminho aguenta!")],
+        [("TRAFO", "Grrr... vou virar você e te cortar com a sua espada!"), (_I, "Uma espada sem treino não corta nada.")]],
+    "KING RIP": [
+        [("KING RIP", "Um samurai. Faz tempo que eu não vejo um de verdade."), (_I, "Mestre. É uma honra.")],
+        [(_I, "Seu nunchaku é rápido. Mas o vento é mais."), ("KING RIP", "Na minha idade, eu sou o vento.")],
+        [("KING RIP", "Depois da luta, um chá na montanha?"), (_I, "Só depois que um de nós cair.")]],
+    "CANNAN": [
+        [("CANNAN", "Eu trouxe um canhão pra uma luta de espada."), (_I, "Então eu corto as balas.")],
+        [(_I, "Você luta de longe. Eu vou até você."), ("CANNAN", "Tenta chegar perto, soldado de pelo.")],
+        [("CANNAN", "Missão: derrubar o gato. Câmbio."), (_I, "Câmbio... e desligo.")]],
+    "FINN": [
+        [("FINN", "Um tigre de armadura! Que criatura rara."), (_I, "E você, um velho com fogo na mão.")],
+        [(_I, "Magia não se defende com espada... por isso eu ataco primeiro."), ("FINN", "Ho ho! Rápido e esperto!")],
+        [("FINN", "Meu golem é feito de pedra, felino."), (_I, "Já cortei montanhas no meu treino.")]],
+    "KUN": [
+        [("KUN", "Aposto uma carta que você não corta ela no ar."), (_I, "Joga.")],
+        [(_I, "Sorte não vence disciplina."), ("KUN", "Ainda bem que eu tenho as duas.")],
+        [("KUN", "Ás de espadas. Combina com você."), (_I, "Então vou ganhar a mão.")]],
+    "TROMOS": [
+        [("TROMOS", "Hssssss..."), (_I, "Um caçador nas sombras. Eu luto na luz.")],
+        [(_I, "Sua cauda é uma lâmina. A minha também."), ("TROMOS", "*KREEEEEE*")],
+        [("TROMOS", "*clic-clic-clic*"), (_I, "Ácido não enferruja aço bom.")]],
+    "TAI": [
+        [("TAI", "Um samurai! No sumô a gente respeita a tradição."), (_I, "No duelo, também.")],
+        [(_I, "Você é uma montanha. Eu sou o vento que passa por ela."), ("TAI", "Vento leve não empurra montanha!")],
+        [("TAI", "Hakkeyoi! Vamos ver quem é mais firme."), (_I, "O mais firme é quem não cai.")]],
+    "TAMER": [
+        [("TAMER", "Um tigre branco! E fala! Nunca vi isso na selva."), (_I, "Eu não sou da selva. Sou da montanha.")],
+        [(_I, "Seu lobo é leal. Isso é respeito."), ("TAMER", "E ele não gosta de gato. Fica esperto.")],
+        [("TAMER", "Garoto, esse aí é perigoso. Fica atrás de mim."), (_I, "Os dois podem vir.")]],
+    "JOHN": [
+        [("JOHN", "Respeitável público: o tigre samurai!"), (_I, "Eu não sou atração de circo.")],
+        [(_I, "Truques não enganam quem enxerga com calma."), ("JOHN", "Então feche os olhos... e PUF!")],
+        [("JOHN", "Minha cartola tem lâminas também!"), (_I, "Lâmina sem mão firme é só enfeite.")]],
+    "CRÁQUEN": [
+        [("CRÁQUEN", "Arrr! Um gato na terra firme! Sobe no meu navio, se tem coragem!"), (_I, "Não preciso de navio. Corto a âncora.")],
+        [(_I, "Fantasma ou não, quem empunha espada pode ser vencido."), ("CRÁQUEN", "Minha espada é de fantasma, gatinho!")],
+        [("CRÁQUEN", "Tesouro, você tem? Har har!"), (_I, "O meu tesouro é a lâmina.")]],
+    "MAGNUS": [
+        [("MAGNUS", "*RRAAWR!*"), (_I, "Fogo e fúria. Sem controle, não vencem.")],
+        [(_I, "Uma fera solta. Vou te ensinar o silêncio."), ("MAGNUS", "*FWOOSH!*")],
+        [("MAGNUS", "*snif... snif...*"), (_I, "Sente o cheiro do aço?")]],
+    "SPHYRUS": [
+        [("SPHYRUS", "*GROOOAR!*"), (_I, "Um predador do mar. Aqui, você está longe de casa.")],
+        [(_I, "Sua mordida é forte. Minha lâmina é mais rápida."), ("SPHYRUS", "*clac-clac*")],
+        [("SPHYRUS", "*SPLASH!*"), (_I, "Nem a água foge do meu corte.")]],
+    "FRIGANTUS": [
+        [("FRIGANTUS", "*GRUUUAAH!*"), (_I, "Grande e forte. Mas lento.")],
+        [(_I, "Na minha montanha não tem neve. Hoje vai ter."), ("FRIGANTUS", "*UH-UH-UH!*")],
+        [("FRIGANTUS", "*fuuuuh...*"), (_I, "Um sopro gelado não para a minha espada.")]],
+}
+_INAZUMANEKO["RIB"] = [  # (fora da rivalidade: no treino, no torneio...)
+    [("RIB", "Um samurai na minha frente? Ninja nunca perde pra samurai!"), (_I, "Ninja se esconde. Samurai encara.")],
+    [(_I, "Você ataca pelas costas, sapo."), ("RIB", "Eu ataco por onde você não olha!")],
+    [("RIB", "Shuriken contra katana. Hoje a gente resolve isso."), (_I, "Já está resolvido. Saca.")]]
+for _outro, _convs in _INAZUMANEKO.items():
+    _chave = tuple(sorted((_I, _outro)))
+    CONVERSAS[_chave] = _convs[0]
+    MAIS[_chave] = _convs[1:]
+# o RIVAL (rivais.py: SAMURAI CONTRA NINJA): o RIB, o ninja sapo
+RIVAIS_CONVERSAS[tuple(sorted((_I, "RIB")))] = [
+    [("RIB", "Um samurai na minha frente? Ninja nunca perde pra samurai!"), (_I, "Ninja se esconde. Samurai encara.")],
+    [(_I, "Você ataca pelas costas, sapo."), ("RIB", "Eu ataco por onde você não olha!")],
+    [("RIB", "Shuriken contra katana. Hoje a gente resolve isso."), (_I, "Já está resolvido. Saca.")]]
+ESPELHO_PROPRIO[_I] = [[(0, "Você copia a minha postura."), (1, "Ou você copia a minha?")],
+                       [(0, "Só um de nós vai embainhar a espada."), (1, "Então saca primeiro.")]]
+RIBBAT_PROPRIO[_I] = [("Um sapo com uma coroa?", "Ribbit."), ("Saca a sua espada, sapo.", "RIBBIT!")]
+FRASES[_I] = "O vento corta."
+
+
+# NOCTURNUS, o morcego-escorpião (personagem 17, v3.0, do Gomes): não fala, só faz SOM (guincho, eco, risadinha)
+_N = "NOCTURNUS"
+_NOCTURNUS = {
+    "MAX-10": [
+        [("MAX-10", "FREQUÊNCIA ULTRASSÔNICA DETECTADA. MEUS SENSORES ESTÃO... TONTOS."), (_N, "*IIIIII!*")],
+        [(_N, "*hihihi...*"), ("MAX-10", "ALVO RINDO. MOTIVO: DESCONHECIDO.")],
+        [("MAX-10", "MORCEGO MUTANTE. CÓDIGO DE BARRAS IGUAL AO DO MAGNUS."), (_N, "*SKREEE!*")]],
+    "RIB": [
+        [("RIB", "Um morcego? Sapo come inseto, não morcego!"), (_N, "*hihihi...*")],
+        [(_N, "*IIIIII!*"), ("RIB", "Ai! Meus ouvidos! Para com isso!")],
+        [("RIB", "Ninja trabalha no escuro também, sabia?"), (_N, "*SKREEE!*")]],
+    "TRAFO": [
+        [("TRAFO", "Grrr... um morcego? Eu pego no ar!"), (_N, "*hihihi...*")],
+        [(_N, "*SKREEE!*"), ("TRAFO", "AUUU! Grito por grito, o meu é mais alto!")],
+        [("TRAFO", "Grrr... para de voar em volta da minha cabeça!"), (_N, "*IIIIII!*")]],
+    "KING RIP": [
+        [("KING RIP", "Na minha época, morcego dormia de dia."), (_N, "*hihihi...*")],
+        [(_N, "*IIIIII!*"), ("KING RIP", "Esse grito... até o meu chá ficou com eco.")],
+        [("KING RIP", "Rápido e barulhento. Vamos ver se aguenta pancada."), (_N, "*SKREEE!*")]],
+    "CANNAN": [
+        [("CANNAN", "Alvo voador, sem visão noturna. Ótimo dia pra isso."), (_N, "*IIIIII!*")],
+        [(_N, "*hihihi...*"), ("CANNAN", "Ele está rindo de mim? Câmbio?")],
+        [("CANNAN", "Meu rádio só pega chiado perto de você."), (_N, "*SKREEE!*")]],
+    "FINN": [
+        [("FINN", "Um morcego mutante! Que ingrediente raro pra uma poção!"), (_N, "*SKREEE!*")],
+        [(_N, "*IIIIII!*"), ("FINN", "Ai, ai! Até o meu chapéu tremeu!")],
+        [("FINN", "Uma canção de ninar? Não vai me fazer dormir, criatura!"), (_N, "*hihihi...*")]],
+    "KUN": [
+        [("KUN", "Aposto que você não sabe jogar cartas de cabeça pra baixo."), (_N, "*hihihi...*")],
+        [(_N, "*IIIIII!*"), ("KUN", "Minhas cartas embaralharam sozinhas com esse grito!")],
+        [("KUN", "Um morcego... essa é a carta coringa."), (_N, "*SKREEE!*")]],
+    "TROMOS": [
+        [("TROMOS", "Hssssss..."), (_N, "*IIIIII!*")],
+        [(_N, "*hihihi...*"), ("TROMOS", "*clic-clic-clic*")],
+        [("TROMOS", "*KREEEEEE*"), (_N, "*SKREEE!*")]],
+    "TAI": [
+        [("TAI", "Fica parado no chão que nem gente!"), (_N, "*hihihi...*")],
+        [(_N, "*SKREEE!*"), ("TAI", "Esse grito não me tira do meu círculo.")],
+        [("TAI", "Hakkeyoi! Desce daí do teto!"), (_N, "*IIIIII!*")]],
+    "TAMER": [
+        [("TAMER", "Morcego-escorpião! Garoto, isso não existe na natureza."), (_N, "*hihihi...*")],
+        [(_N, "*IIIIII!*"), ("TAMER", "Calma, garoto! O grito dele assusta, mas não morde... ainda.")],
+        [("TAMER", "Pegadas não tem. Ele só voa. Fica esperto."), (_N, "*SKREEE!*")]],
+    "JOHN": [
+        [("JOHN", "Respeitável público: o morcego que canta!"), (_N, "*IIIIII!*")],
+        [(_N, "*hihihi...*"), ("JOHN", "Para o meu próximo truque: protetor de ouvido!")],
+        [("JOHN", "Na minha cartola só tem coelho, não morcego!"), (_N, "*SKREEE!*")]],
+    "CRÁQUEN": [
+        [("CRÁQUEN", "Arrr! Morcego na minha caverna de tesouro? Fora!"), (_N, "*SKREEE!*")],
+        [(_N, "*hihihi...*"), ("CRÁQUEN", "Fantasma não dorme, bicho! Sua canção não pega em mim!")],
+        [("CRÁQUEN", "Esse grito acordou até a tripulação inteira!"), (_N, "*IIIIII!*")]],
+    "MAGNUS": [
+        [("MAGNUS", "*RRAAWR!*"), (_N, "*IIIIII!*")],
+        [(_N, "*hihihi...*"), ("MAGNUS", "*snif... snif...*")],
+        [("MAGNUS", "*FWOOSH!*"), (_N, "*SKREEE!*")]],
+    "FRIGANTUS": [
+        [("FRIGANTUS", "*GRUUUAAH!*"), (_N, "*IIIIII!*")],
+        [(_N, "*hihihi...*"), ("FRIGANTUS", "*UH-UH-UH!*")],
+        [("FRIGANTUS", "*fuuuuh...*"), (_N, "*SKREEE!*")]],
+    "INAZUMANEKO": [
+        [(_N, "*IIIIII!*"), ("INAZUMANEKO", "Um grito não me tira o foco.")],
+        [("INAZUMANEKO", "Você luta escondido no escuro. Eu luto de frente."), (_N, "*hihihi...*")],
+        [(_N, "*SKREEE!*"), ("INAZUMANEKO", "Asas e ferrão. Os dois vão ser cortados.")]],
+}
+_NOCTURNUS["SPHYRUS"] = [  # (fora da rivalidade)
+    [("SPHYRUS", "*GROOOAR!*"), (_N, "*SKREEE!*")],
+    [(_N, "*hihihi...*"), ("SPHYRUS", "*clac-clac*")],
+    [("SPHYRUS", "*SPLASH!*"), (_N, "*IIIIII!*")]]
+for _outro, _convs in _NOCTURNUS.items():
+    _chave = tuple(sorted((_N, _outro)))
+    CONVERSAS[_chave] = _convs[0]
+    MAIS[_chave] = _convs[1:]
+# o RIVAL (rivais.py: IRMÃOS DE LABORATÓRIO): o SPHYRUS (os dois fugiram do mesmo laboratório)
+RIVAIS_CONVERSAS[tuple(sorted((_N, "SPHYRUS")))] = [
+    [(_N, "*IIIIII!*"), ("SPHYRUS", "*GROOOAR!*")],
+    [("SPHYRUS", "*shhhhk...*"), (_N, "*hihihi...*")],
+    [(_N, "*SKREEE!*"), ("SPHYRUS", "*CHOMP!*")]]
+ESPELHO_PROPRIO[_N] = [[(0, "*IIIIII!*"), (1, "*IIIIIIII!!*")],
+                       [(0, "*hihihi...*"), (1, "*hihihi...*")]]
+RIBBAT_PROPRIO[_N] = [("*SKREEE!*", "...Ribbit."), ("*hihihi...*", "RIBBIT!")]
+FRASES[_N] = "*IIIIII!*"
+
+
+# SILVANUS, a planta carnívora guardiã da Floresta Antiga (personagem 18, v3.0, do Gomes): ELA fala POUQUÍSSIMO —
+# frases curtas e calmas de guardiã antiga ("Este não é seu lugar.")
+_S = "SILVANUS"
+_SILVANUS = {
+    "MAX-10": [
+        [("MAX-10", "FORMA DE VIDA VEGETAL. NÍVEL DE AMEAÇA: BAIXO."), (_S, "...Raízes não aparecem no seu radar.")],
+        [(_S, "Metal não cresce."), ("MAX-10", "CORRETO. METAL É ATUALIZADO.")],
+        [("MAX-10", "ANALISANDO... ESSA PLANTA TEM DENTES."), (_S, "Tem.")]],
+    "RIB": [
+        [("RIB", "Uma planta que morde? Na minha lagoa não tem disso!"), (_S, "Este não é seu lugar.")],
+        [(_S, "Pequeno sapo. Pule com cuidado."), ("RIB", "Por quê?! ...Ai! Tinha uma armadilha ali!")],
+        [("RIB", "Ninja se esconde no mato. Você É o mato!"), (_S, "Então eu sempre te vejo.")]],
+    "TRAFO": [
+        [("TRAFO", "Grrr... vira uma planta também? Eu viro!"), (_S, "Você copia a forma. Não a raiz.")],
+        [(_S, "Animal inquieto."), ("TRAFO", "AUUU! Planta parada!")],
+        [("TRAFO", "Grrr... cheira a terra molhada."), (_S, "Cheira a casa.")]],
+    "KING RIP": [
+        [("KING RIP", "Na minha época, as plantas ficavam no vaso."), (_S, "Na minha época, não existia vaso.")],
+        [(_S, "Velho mestre."), ("KING RIP", "Velha planta. Vamos ver quem tem mais paciência.")],
+        [("KING RIP", "Seu chá deve ser amargo."), (_S, "Não vire o meu chá.")]],
+    "CANNAN": [
+        [("CANNAN", "Terreno hostil, vegetação armada. Câmbio."), (_S, "Abaixe a arma. Aqui, quem caça sou eu.")],
+        [(_S, "Botas pesadas pisam nas minhas mudas."), ("CANNAN", "Desculpa, mas a missão é a missão.")],
+        [("CANNAN", "Nenhum mapa mostra essa floresta."), (_S, "Ela não quer ser achada.")]],
+    "FINN": [
+        [("FINN", "Uma guardiã da floresta! Posso pegar uma folhinha pra poção?"), (_S, "...Uma.")],
+        [(_S, "Seu fogo assusta as árvores."), ("FINN", "Prometo que é fogo do bem! ...Quase sempre.")],
+        [("FINN", "Essas runas são mais velhas que o meu livro!"), (_S, "Mais velhas que o seu mestre.")]],
+    "KUN": [
+        [("KUN", "Aposto que você nunca perdeu um jogo de paciência."), (_S, "Nunca joguei. Só esperei.")],
+        [(_S, "Cartas são feitas de árvore."), ("KUN", "...Ok, isso ficou estranho.")],
+        [("KUN", "Qual é a sua carta na manga?"), (_S, "Raiz.")]],
+    "TROMOS": [
+        [("TROMOS", "Hssssss..."), (_S, "Volte para a sombra.")],
+        [(_S, "Caçador do escuro."), ("TROMOS", "*clic-clic-clic*")],
+        [("TROMOS", "*KREEEEEE*"), (_S, "Aqui, o escuro é meu.")]],
+    "TAI": [
+        [("TAI", "Pé no chão, que nem eu! Gostei."), (_S, "Raiz no chão. É diferente.")],
+        [(_S, "Você é pesado."), ("TAI", "Hakkeyoi! É o que eu mais escuto!")],
+        [("TAI", "Sai do meu círculo, plantinha!"), (_S, "O círculo é da floresta.")]],
+    "TAMER": [
+        [("TAMER", "Planta carnívora do tamanho de um homem. Fica perto de mim, garoto."), (_S, "Este não é seu lugar.")],
+        [(_S, "Você caça na minha floresta."), ("TAMER", "Eu protejo ela. Do meu jeito.")],
+        [("TAMER", "Lobo nenhum chega perto disso aí."), (_S, "Lobos são sábios.")]],
+    "JOHN": [
+        [("JOHN", "Para o meu próximo truque: fazer uma flor aparecer!"), (_S, "Eu faço florestas aparecerem.")],
+        [(_S, "Seu coelho tem cheiro de comida."), ("JOHN", "NÃO. Nem pensar. Ele é da família!")],
+        [("JOHN", "Respeitável público: a planta que morde!"), (_S, "Não sou um show.")]],
+    "CRÁQUEN": [
+        [("CRÁQUEN", "Arrr! Madeira boa pra consertar meu navio!"), (_S, "Toque numa árvore. Uma só.")],
+        [(_S, "Você cheira a mar e a morte."), ("CRÁQUEN", "Hahaha! É o meu perfume, marujo!")],
+        [("CRÁQUEN", "Tem tesouro enterrado nessas raízes?"), (_S, "Tem. E vai continuar enterrado.")]],
+    "MAGNUS": [
+        [("MAGNUS", "*RRAAWR!*"), (_S, "Fogo, não. Aqui, não.")],
+        [(_S, "Pequeno dragão."), ("MAGNUS", "*snif... snif...*")],
+        [("MAGNUS", "*FWOOSH!*"), (_S, "...Minhas folhas.")]],
+    "FRIGANTUS": [
+        [("FRIGANTUS", "*GRUUUAAH!*"), (_S, "O inverno passa. A floresta fica.")],
+        [(_S, "Grande e peludo."), ("FRIGANTUS", "*UH-UH-UH!*")],
+        [("FRIGANTUS", "*fuuuuh...*"), (_S, "Frio. Eu durmo no frio.")]],
+    "SPHYRUS": [
+        [("SPHYRUS", "*GROOOAR!*"), (_S, "Águas paradas. Dentes demais.")],
+        [(_S, "Você também morde."), ("SPHYRUS", "*CHOMP!*")],
+        [("SPHYRUS", "*SPLASH!*"), (_S, "Obrigada pela água.")]],
+    "INAZUMANEKO": [
+        [("INAZUMANEKO", "Uma lâmina corta qualquer planta."), (_S, "E a planta cresce de novo.")],
+        [(_S, "Guerreiro paciente."), ("INAZUMANEKO", "Guardiã paciente. Lutamos com honra.")],
+        [("INAZUMANEKO", "Sua floresta é silenciosa como o meu monte."), (_S, "Silêncio é força.")]],
+    "NOCTURNUS": [
+        [("NOCTURNUS", "*IIIIII!*"), (_S, "Shhh. A floresta dorme.")],
+        [(_S, "Asas de couro, cheiro de caverna."), ("NOCTURNUS", "*hihihi...*")],
+        [("NOCTURNUS", "*SKREEE!*"), (_S, "Gritar não faz a raiz soltar.")]],
+}
+for _outro, _convs in _SILVANUS.items():
+    _chave = tuple(sorted((_S, _outro)))
+    CONVERSAS[_chave] = _convs[0]
+    MAIS[_chave] = _convs[1:]
+# o RIVAL (rivais.py): o TAMER (o caçador que entra na floresta dela)
+RIVAIS_CONVERSAS[tuple(sorted((_S, "TAMER")))] = [
+    [(_S, "Caçador. De novo."), ("TAMER", "Eu só sigo as pegadas. Elas sempre me trazem aqui.")],
+    [("TAMER", "Calma, garoto... essa aí já pegou um lobo meu uma vez."), (_S, "Ele pisou onde não devia.")],
+    [(_S, "Saia da minha floresta."), ("TAMER", "A floresta não é sua. É de todo mundo que cuida dela.")]]
+ESPELHO_PROPRIO[_S] = [[(0, "Duas raízes. Uma terra."), (1, "Só uma fica.")],
+                       [(0, "...Este não é seu lugar."), (1, "...Nem o seu.")]]
+RIBBAT_PROPRIO[_S] = [("...O que é você?", "...Ribbit."), ("Este não é seu lugar.", "RIBBIT!")]
+FRASES[_S] = "Este não é seu lugar."

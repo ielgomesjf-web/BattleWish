@@ -2,11 +2,11 @@
 
 <h1 align="center">BATTLE WISH</h1>
 
-<p align="center">Um jogo de luta 2D estilo Street Fighter, com 15 personagens próprios, pixel art, combos, ultimates e online com os amigos.</p>
+<p align="center">Um jogo de luta 2D estilo Street Fighter, com 18 personagens próprios, pixel art, combos, ultimates e online com os amigos.</p>
 
 <p align="center"><b><a href="https://github.com/ielgomesjf-web/BattleWish/releases/latest">⬇️ Baixar o jogo (Windows)</a></b></p>
 
-![Sphyrus contra o Frigantus](imagens/v2_luta.png)
+![Silvanus contra o Nocturnus na Floresta Antiga](imagens/v3_luta.png)
 
 ## Como baixar e jogar
 
@@ -17,7 +17,21 @@
    **"Executar assim mesmo"**.
 
 Funciona no Windows 10 e 11. O save (moedas, roupas, troféus, figurinhas) fica num arquivo `battlewish_save.json`
-do lado do jogo. Quem já jogava a 1.0 continua com tudo.
+do lado do jogo. Quem já jogava as versões antigas continua com tudo.
+
+## Novidades da versão 3.0
+
+- **3 lutadores novos**: INAZUMANEKO, NOCTURNUS e SILVANUS (agora são 18), cada um com a sua casa:
+  **Monte Karasuma**, **Caverna dos Morcegos** e **Floresta Antiga**.
+- **MÚSICAS do Gomes**: WARRIOR SPIRIT e LAST STAND nas lutas, BEFORE THE BATTLE no menu. Um **radinho** no canto
+  mostra o que está tocando, e a tecla **M** troca a música.
+- **ESQUIVA PERFEITA**: rolou no último instante antes do golpe pegar? O oponente fica em câmera lenta por 1 segundo.
+- **RANKING DE ESTILO**: uma letra de **D** a **SSS** que sobe quando você varia os golpes. No fim, dá moedas.
+- **CENÁRIO QUE QUEBRA**: quem é jogado na parede racha a parede, quem cai forte racha o chão. Cada mapa quebra do
+  seu jeito.
+- Animações mais fluidas em todo mundo, cenas de anime novas na loja e os novos no DESFILE DE FORMAS do TRAFO.
+
+![Sphyrus contra o Frigantus](imagens/v2_luta.png)
 
 ## Novidades da versão 2.0
 
@@ -56,6 +70,9 @@ do lado do jogo. Quem já jogava a 1.0 continua com tudo.
 | **MAGNUS** | o raptor-robô de fogo: espinhos que prendem, rabadas, o bote e a rabada de fogo que paralisa |
 | **SPHYRUS** | o tubarão-martelo: giro com onda de ar, martelada pra cima, mergulho na terra e o chão que vira MAR |
 | **FRIGANTUS** | o gorila das neves: bola de neve que congela, estacas de gelo, escorregão e a AVALANCHE |
+| **INAZUMANEKO** | o tigre samurai: cortes em meia-lua, passo relâmpago e os MIL CORTES |
+| **NOCTURNUS** | o morcego-escorpião: bola de eco que troca os controles, nuvem de morcegos e a CANÇÃO DE NINAR |
+| **SILVANUS** | a planta carnívora guardiã da floresta: cospe sementes, planta ARMADILHAS e chama a CHUVA DE SEMENTES |
 
 Cada um tem 4 especiais, duas ULTIMATES, uma habilidade própria, entrada, pose de vitória e roupas pra comprar na
 loja. E tem segredo escondido na tela de **CÓDIGOS**: as pistas ficam lá e na loja...
@@ -71,7 +88,7 @@ loja. E tem segredo escondido na tela de **CÓDIGOS**: as pistas ficam lá e na 
 - **TORNEIO**: chave de 8 lutadores até a final. As lutas dos computadores dá pra assistir ou pular.
 - **ONLINE**: contra um amigo em outra casa, sem precisar de VPN. Quem cria a sala escolhe o modo:
   1 contra 1, trio ou torneio (vocês 2 + 6 computadores), e pode ligar os modos malucos.
-  Os dois precisam estar com a **mesma versão** do jogo (a 2.0 não joga online com a 1.0).
+  Os dois precisam estar com a **mesma versão** do jogo (a 3.0 não joga online com a 2.0).
 - **SOBREVIVÊNCIA**: um adversário atrás do outro até cair.
 - **MODOS MALUCOS**: gravidade da lua, cabeções, turbo, só ultimate e um golpe mata.
 - **MODO TREINO** e **COMBOS**: pra aprender os golpes e os desafios de combo de cada lutador.
@@ -93,7 +110,9 @@ do jogo mostra tudo.
 | segura a rodinha + C | LT + RT | 2ª ULTIMATE (com a barra amarela cheia) |
 | rodinha 2x + especial | LT + especial | especial EX (gasta barra) |
 | rodinha 2x apanhando | LT apanhando | ESCAPE de combo |
+| M1 + M2 juntos | A + B | rolar (no último instante: ESQUIVA PERFEITA) |
 | T | BACK | provocar |
+| M | | trocar a música (na luta) |
 | G | R3 | trocar de lutador (TRIO) |
 | ESC | START | pausa |
 | F11 | | tela cheia |

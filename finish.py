@@ -508,6 +508,175 @@ def frigantus_desenhar(v, d, tela, t):
             texto_tela(tela, "SOTERRADO!", (d.x, CHAO - 170), (200, 240, 255))
 
 
+# =====================================================================
+# INAZUMANEKO: CORTE DE CABELO! (passa num relâmpago, embainha a espada... *clic*... e o derrotado fica CARECA)
+# =====================================================================
+INAZ_PASSA, INAZ_CLIC = 24, 50
+
+
+def inazumaneko_passo(v, d, t, jogo):
+    if t < INAZ_PASSA:
+        pose(v, "i_respira" if t < 14 else "i_saca")
+    elif t == INAZ_PASSA:  # o PASSO: atravessa pro outro lado num piscar de olhos
+        v.x = d.x + (d.x - v.x) * 0.6 + (70 if d.x > v.x else -70)
+        v.x = max(PAREDE_E, min(PAREDE_D, v.x))
+        v.dir = 1 if d.x > v.x else -1
+        pose(v, "i_passo")
+        som.tocar("vento", 0.8)
+    elif t < INAZ_CLIC:
+        pose(v, "i_passo", "i_embainha", suave(min(1, (t - INAZ_PASSA) / 20)))
+    else:
+        pose(v, "i_embainha", "i_curva", suave(min(1, (t - INAZ_CLIC) / 14)))
+    if t == INAZ_CLIC:
+        som.tocar("defesa", 0.6)
+        jogo.tremer(6)
+
+
+def inazumaneko_desenhar(v, d, tela, t):
+    if INAZ_PASSA <= t < INAZ_PASSA + 6:  # o RISCO do corte relâmpago
+        u = (t - INAZ_PASSA) / 6
+        pygame.draw.line(tela, (230, 245, 255), (d.x - 120, CHAO - 50 - 40 * u), (d.x + 120, CHAO - 70 + 40 * u), 4)
+    if t >= INAZ_CLIC:
+        cb = ponto_do_caido(d, "cb")
+        s = d.s
+        careca = pygame.Rect(0, 0, 18 * s, 13 * s)  # a cabeça CARECA, brilhando
+        careca.center = (int(cb[0]), int(cb[1] - 2 * s))
+        pygame.draw.ellipse(tela, (16, 14, 20), careca.inflate(4, 4))
+        pygame.draw.ellipse(tela, (236, 204, 172), careca)
+        if (t // 8) % 3 == 0:
+            pygame.draw.circle(tela, (255, 255, 255), (careca.x + int(careca.w * 0.3), careca.y + int(careca.h * 0.3)), max(2, int(2 * s)))
+        rnd = __import__("random").Random(5)
+        for i in range(10):  # os fios de CABELO caindo devagar, balançando
+            u = min(1, (t - INAZ_CLIC) / 50)
+            x = cb[0] + rnd.uniform(-30, 30) + math.sin(t * 0.1 + i) * 8
+            y = cb[1] - 60 + u * (60 + rnd.uniform(0, 20))
+            pygame.draw.line(tela, (60, 40, 30), (x, y), (x + 6, y + 3), 2)
+        if t < 120:
+            texto_tela(tela, "CORTE DE CABELO!", (d.x, CHAO - 150), (230, 245, 255))
+
+
+# =====================================================================
+# NOCTURNUS: PENDURADO! (a nuvem de morcegos carrega o derrotado e pendura ele de cabeça pra baixo, lá no alto)
+# =====================================================================
+NOCT_PEGA, NOCT_SOBE = 30, 90
+
+
+def nocturnus_passo(v, d, t, jogo):
+    pose(v, "n_grito" if t < NOCT_PEGA else "n_ri")
+    if t == 4:
+        som.tocar("vento", 0.7)
+    if NOCT_PEGA <= t < NOCT_SOBE:  # sobe carregado pelos morcegos
+        d.y = CHAO - (t - NOCT_PEGA) ** 1.3 * 2.4
+    if t == NOCT_SOBE:
+        d.esconde = True
+
+
+def _morceguinho(tela, x, y, t, i):
+    asa = 5 if (t // 3 + i) % 2 else -3
+    pygame.draw.polygon(tela, (20, 14, 28), [(x - 10, y - asa), (x - 3, y - 2), (x, y + 2), (x + 3, y - 2), (x + 10, y - asa),
+                                             (x + 4, y + 2), (x, y + 5), (x - 4, y + 2)])
+    pygame.draw.circle(tela, (255, 70, 70), (int(x - 1), int(y)), 1)
+    pygame.draw.circle(tela, (255, 70, 70), (int(x + 2), int(y)), 1)
+
+
+def nocturnus_desenhar(v, d, tela, t):
+    rnd = __import__("random").Random(9)
+    if t < NOCT_SOBE:  # a NUVEM de morcegos chegando e cobrindo o derrotado
+        k = min(1, t / NOCT_PEGA)
+        for i in range(22):
+            ax, ay = rnd.uniform(-400, 400), rnd.uniform(-300, -60)
+            cx = d.x + rnd.uniform(-40, 40) + math.sin(t * 0.3 + i) * 10
+            cy = d.y - 50 + rnd.uniform(-40, 30) + math.cos(t * 0.25 + i) * 8
+            _morceguinho(tela, ax + (cx - ax) * k + d.x * (1 - k) * 0, ay * (1 - k) + cy * k, t, i)
+    else:  # lá no alto: o CASULO pendurado de cabeça pra baixo, balançando (com os pezinhos pra cima)
+        x = d.x + math.sin(t * 0.06) * 10
+        pygame.draw.line(tela, (60, 50, 70), (d.x, 40), (x, 90), 2)
+        casulo = pygame.Rect(0, 0, 34, 70)
+        casulo.midtop = (int(x), 88)
+        pygame.draw.ellipse(tela, (16, 10, 22), casulo.inflate(4, 4))
+        pygame.draw.ellipse(tela, (60, 44, 80), casulo)
+        for i in range(3):  # os morcegos que ficaram em volta
+            _morceguinho(tela, x + (i - 1) * 30, 80 + math.sin(t * 0.2 + i) * 6, t, i)
+        if t < 150:
+            texto_tela(tela, "PENDURADO!", (d.x, 220), (200, 160, 255))
+
+
+# =====================================================================
+# SILVANUS: ADUBO! (as raízes saem da terra, abraçam o derrotado e puxam ele pra baixo... e no lugar nasce uma FLOR)
+# =====================================================================
+SILV_RAIZ, SILV_PUXA, SILV_SOME, SILV_BROTA = 16, 40, 92, 104
+
+
+def silvanus_passo(v, d, t, jogo):
+    pose(v, "s_raizes" if t < SILV_SOME else "s_ergue")
+    if t == SILV_RAIZ:
+        som.tocar("terra", 0.8)
+        poeira(jogo, d.x, 6)
+    if SILV_PUXA <= t < SILV_SOME:  # puxado pra dentro da terra, aos trancos
+        d.cortar_chao = True
+        u = (t - SILV_PUXA) / (SILV_SOME - SILV_PUXA)
+        d.y = CHAO + (u ** 1.4) * 60 * d.s + (3 if (t // 4) % 2 else 0)
+        if t % 8 == 0:
+            poeira(jogo, d.x, 3)
+    if t == SILV_SOME:
+        d.esconde = True
+        som.tocar("queda", 0.5)
+    if t == SILV_BROTA:
+        som.tocar("blip", 0.6)
+
+
+def _raiz_curva(tela, base, ponta, curva, grosso):
+    pts = []
+    for i in range(9):
+        k = i / 8
+        x = base[0] + (ponta[0] - base[0]) * k
+        y = base[1] + (ponta[1] - base[1]) * k - math.sin(k * math.pi) * curva
+        pts.append((x, y))
+    pygame.draw.lines(tela, (40, 26, 16), False, pts, grosso + 4)
+    pygame.draw.lines(tela, (112, 78, 46), False, pts, grosso)
+    pygame.draw.lines(tela, (150, 110, 70), False, pts[:5], max(1, grosso // 3))
+
+
+def silvanus_desenhar(v, d, tela, t):
+    s = d.s
+    meio = d.extra.setdefault("adubo_x", ponto_do_caido(d, "pc")[0])  # (o meio do corpo deitado)
+    if SILV_RAIZ <= t < SILV_SOME:  # as RAÍZES saindo da terra e abraçando o derrotado (e afundando junto)
+        cresce = suave(min(1, (t - SILV_RAIZ) / (SILV_PUXA - SILV_RAIZ)))
+        if t >= SILV_PUXA:
+            cresce *= 1 - suave((t - SILV_PUXA) / (SILV_SOME - SILV_PUXA))
+        corpo_y = min(CHAO - 4, d.y - 18 * s)
+        for i, (dx, lado) in enumerate(((-60, 1), (-25, 1), (10, -1), (45, -1), (-45, -1), (70, -1))):
+            base = (meio + dx * s - lado * 40 * s, CHAO + 4)
+            ponta = (base[0] + lado * 80 * s * cresce, corpo_y + (CHAO - corpo_y) * (1 - cresce))
+            _raiz_curva(tela, base, ponta, (40 + i * 6) * s * cresce, max(3, int((7 - i % 3) * s / 1.4)))
+    if t >= SILV_PUXA:  # o MONTINHO de terra fofa (adubada)
+        k = min(1, (t - SILV_PUXA) / 30)
+        pygame.draw.ellipse(tela, (30, 20, 12), (meio - 50 * s, CHAO - 14 * s * k - 4, 100 * s, 28 * s * k + 8))
+        pygame.draw.ellipse(tela, (96, 66, 38), (meio - 46 * s, CHAO - 12 * s * k - 2, 92 * s, 24 * s * k + 4))
+        for i in range(5):
+            pygame.draw.circle(tela, (70, 48, 28), (int(meio + (i - 2) * 16 * s), int(CHAO - 4 * s * k)), max(1, int(2 * s)))
+    if t >= SILV_BROTA:  # a FLOR nascendo no lugar: o broto sobe, as folhas abrem e a flor desabrocha
+        u = suave(min(1, (t - SILV_BROTA) / 30))
+        s *= 1.6  # (a flor é grandona)
+        abre = suave(max(0, min(1, (t - SILV_BROTA - 22) / 16)))
+        topo = (meio, CHAO - 12 * s - 70 * s * u)
+        pygame.draw.line(tela, (20, 40, 16), (meio, CHAO - 10 * s), topo, max(3, int(5 * s)))
+        pygame.draw.line(tela, (80, 160, 60), (meio, CHAO - 10 * s), topo, max(2, int(3 * s)))
+        for lado in (-1, 1):  # as duas folhinhas
+            fy = CHAO - 12 * s - 34 * s * u
+            pts = [(meio, fy), (meio + lado * 26 * s * u, fy - 14 * s * u), (meio + lado * 10 * s * u, fy - 4 * s * u)]
+            if u > 0.1:
+                contorno(tela, (90, 180, 70), pts)
+        if abre > 0:
+            for i in range(6):  # as pétalas (rosa) e o miolo (amarelo)
+                a = i * math.tau / 6 + t * 0.01
+                px, py = topo[0] + math.cos(a) * 12 * s * abre, topo[1] + math.sin(a) * 12 * s * abre
+                pygame.draw.circle(tela, (16, 12, 20), (int(px), int(py)), int(9 * s * abre) + 2)
+                pygame.draw.circle(tela, (250, 130, 190), (int(px), int(py)), max(1, int(9 * s * abre)))
+            pygame.draw.circle(tela, (16, 12, 20), (int(topo[0]), int(topo[1])), int(7 * s * abre) + 2)
+            pygame.draw.circle(tela, (255, 220, 80), (int(topo[0]), int(topo[1])), max(1, int(7 * s * abre)))
+
+
 FINISHES = {
     "MAX-10": dict(passo=max_passo, desenhar=max_desenhar, nome="RECICLADO!"),
     "RIB": dict(passo=rib_passo, desenhar=rib_desenhar, nome="PRESO NO CHÃO!"),
@@ -525,6 +694,9 @@ FINISHES = {
     "MAGNUS": dict(passo=magnus_passo, desenhar=magnus_desenhar, nome="TOSTADO!"),
     "SPHYRUS": dict(passo=sphyrus_passo, desenhar=sphyrus_desenhar, nome="VIROU ISCA!"),
     "FRIGANTUS": dict(passo=frigantus_passo, desenhar=frigantus_desenhar, nome="SOTERRADO!"),
+    "INAZUMANEKO": dict(passo=inazumaneko_passo, desenhar=inazumaneko_desenhar, nome="CORTE DE CABELO!"),
+    "NOCTURNUS": dict(passo=nocturnus_passo, desenhar=nocturnus_desenhar, nome="PENDURADO!"),
+    "SILVANUS": dict(passo=silvanus_passo, desenhar=silvanus_desenhar, nome="ADUBO!"),
 }
 
 

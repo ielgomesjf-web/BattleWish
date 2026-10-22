@@ -56,6 +56,13 @@ POSES_FRIGANTUS = {  # (curvado pra frente como gorila; os braços apoiam os nó
                     ct=(-22, 104), mt=(-36, 130), cf=(26, 104), mf=(42, 130)),
     "fr_soco": dict(pt=(-28, 0), jt=(-14, 26), pf=(30, 0), jf=(36, 28), qd=(0, 50), pc=(30, 80), cb=(46, 78),
                     ct=(10, 66), mt=(4, 44), cf=(48, 82), mf=(82, 86)),
+    # (as poses do meio: deixam os golpes FLUIDOS — pedido do Gomes)
+    "fr_pisao_bate": dict(pt=(-22, 0), jt=(-12, 18), pf=(26, 0), jf=(32, 18), qd=(0, 40), pc=(30, 66), cb=(46, 62),
+                          ct=(30, 44), mt=(36, 18), cf=(48, 44), mf=(62, 20)),
+    "fr_mergulha": dict(pt=(-30, 4), jt=(-16, 20), pf=(10, 0), jf=(20, 18), qd=(0, 34), pc=(36, 46), cb=(54, 44),
+                        ct=(56, 40), mt=(76, 40), cf=(58, 42), mf=(80, 44)),
+    "fr_levanta": dict(pt=(-36, 0), jt=(-20, 10), pf=(-20, 0), jf=(-6, 12), qd=(0, 24), pc=(30, 40), cb=(46, 40),
+                       ct=(38, 22), mt=(44, 0), cf=(46, 22), mf=(54, 0)),
 }
 proporcionar(POSES_FRIGANTUS)
 
@@ -534,7 +541,8 @@ _registra("frigantus_neve", ini=E_SOLTA, ativo=1, rec=16, dano=0, hit=0, defe=0,
 GOLPES["frigantus_estaca"] = dict(dano=12, hit=24, defe=10, emp=2, nivel="baixo", especial=True, lanca=16)
 _registra("frigantus_pisao", ini=Q_PISA, ativo=Q_ESTACAS * Q_CADA, rec=24, dano=0, hit=0, defe=0, emp=0,
           nivel="medio", logica=pisao, efeito=pisao_efeito, ia="perto", lanca_depois=True,
-          quadros=[(0, "parado"), (6, "fr_pisao"), (Q_PISA - 2, "fr_pisao"), (Q_PISA, "parado")])
+          quadros=[(0, "parado"), (6, "fr_pisao"), (Q_PISA - 2, "fr_pisao"), (Q_PISA + 1, "fr_pisao_bate"),
+                   (Q_PISA + 10, "fr_pisao_bate"), (Q_PISA + 22, "parado")])
 GOLPES["frigantus_pisao"]["total"] = 9999
 GOLPES["frigantus_estaca_cabeca"] = dict(dano=2, hit=16, defe=6, emp=0, nivel="alto", especial=True)
 _registra("frigantus_bloco", ini=R_SOCA, ativo=1, rec=0, dano=0, hit=0, defe=0, emp=0, nivel="medio",
@@ -545,8 +553,8 @@ GOLPES["frigantus_bloco"]["total"] = 9999
 _registra("frigantus_escorregao", base="agachado", ini=S_SAI, ativo=S_VAI, rec=18, janelas=((S_SAI, S_SAI + S_VAI),),
           caixa=(0, 0, 80, 40), dano=10, hit=24, defe=10, emp=4, nivel="baixo", derruba=True, voo=(6, 8),
           logica=escorregao, efeito=escorregao_efeito, ia="medio",
-          quadros=[(0, "parado"), (S_SAI - 2, "fr_barriga"), (S_SAI + S_VAI, "fr_barriga"),
-                   (S_SAI + S_VAI + 16, "parado")])
+          quadros=[(0, "parado"), (5, "fr_mergulha"), (S_SAI - 1, "fr_barriga"), (S_SAI + S_VAI, "fr_barriga"),
+                   (S_SAI + S_VAI + 8, "fr_levanta"), (S_SAI + S_VAI + 16, "parado")])
 GOLPES["frigantus_escorregao"]["total"] = 9999
 GOLPES["frigantus_avalanche"] = dict(dano=40, hit=40, defe=20, emp=6, nivel="medio", especial=True, ultimate=True,
                                      derruba=True, voo=(6, 8))

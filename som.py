@@ -274,11 +274,103 @@ def _musica_menu():
     return _som(mix / max(1.0, np.abs(mix).max()) * 0.8)
 
 
+# =====================================================================
+# MÚSICAS do Gomes (do Strudel: musica.py): LUTA = WARRIOR SPIRIT, MENU = BEFORE THE BATTLE. Fabricar leva uns
+# segundos na 1ª vez (depois fica guardada em "musica_pronta"), então começa numa THREAD quando o jogo abre; até
+# ficar pronta, toca a música antiga (e o atualizar() troca assim que fica pronta).
+# =====================================================================
+MUSICA_MENU = "before_the_battle"
+MUSICAS_LUTA = ["warrior_spirit", "last_stand"]  # (o RADINHO: sorteia uma por luta, sem repetir; M passa pra próxima)
+MUSICA_LUTA = MUSICAS_LUTA[0]  # (a que está tocando na luta: o nome que o radinho mostra)
+_prontas = {}  # nome da música -> o vetor, quando a thread termina
+_sorteio = __import__("random").Random()  # (sorteio SÓ da música: não mexe no random da luta, o online fica igual)
+
+
+def preparar_musicas():
+    """Chamado quando o jogo abre (no menu): fabrica (ou lê do arquivo) as músicas do Gomes em segundo plano."""
+    if not _iniciar() or _prontas:
+        return
+    import threading
+
+    def fabrica():
+        try:
+            import musica as _m
+            import save
+            for nome in [MUSICA_MENU] + MUSICAS_LUTA:  # (o menu primeiro: é a que já está tocando)
+                _prontas[nome] = _m.carregar(nome, os.path.join(save.pasta_do_jogo(), "musica_pronta"))
+        except Exception:
+            pass
+    threading.Thread(target=fabrica, daemon=True).start()
+
+
+def _trilha(nome):
+    """O som pronto da música do Gomes (na taxa do mixer), ou None se ainda não ficou pronta."""
+    if "trilha_" + nome not in _sons:
+        if nome not in _prontas:
+            return None
+        try:
+            x = _prontas[nome]
+            freq = (pygame.mixer.get_init() or (TAXA,))[0]
+            if freq != TAXA:  # (o mixer abriu em outra taxa: estica pra música tocar na velocidade e no tom certos)
+                x = np.interp(np.arange(int(len(x) * freq / TAXA)) * TAXA / freq, np.arange(len(x)), x)
+            _sons["trilha_" + nome] = _som(x * 0.9)
+        except Exception:
+            return None
+    return _sons["trilha_" + nome]
+
+
+def _escolher(qual, proxima=False):
+    """Põe a música do Gomes no lugar de 'musica_<qual>'. Luta: sorteia (sem repetir a última) ou a PRÓXIMA."""
+    global MUSICA_LUTA
+    if qual == "menu":
+        t = _trilha(MUSICA_MENU)
+        if t:
+            _sons["musica_menu"], _sons["_nova_menu"] = t, MUSICA_MENU
+        return
+    prontas = [n for n in MUSICAS_LUTA if _trilha(n)]
+    if not prontas:
+        return
+    if proxima:
+        i = MUSICAS_LUTA.index(MUSICA_LUTA)
+        nome = next(MUSICAS_LUTA[(i + k) % len(MUSICAS_LUTA)] for k in range(1, len(MUSICAS_LUTA) + 1)
+                    if MUSICAS_LUTA[(i + k) % len(MUSICAS_LUTA)] in prontas)
+    else:
+        outras = [n for n in prontas if n != _sons.get("_nova_luta")] or prontas
+        nome = _sorteio.choice(outras)
+    MUSICA_LUTA = nome
+    _sons["musica_luta"], _sons["_nova_luta"] = _trilha(nome), nome
+
+
+def proxima_musica():
+    """(Tecla M na luta.) Passa pra próxima música de luta."""
+    global _musica_atual
+    if _musica_atual != "luta" or not _iniciar():
+        return
+    _escolher("luta", proxima=True)
+    _musica_atual = None
+    _ja_escolheu[0] = True
+    musica("luta")
+
+
+_ja_escolheu = [False]
+
+
+def atualizar():
+    """(Todo quadro, no laço do jogo.) A música do Gomes que está tocando ficou pronta agora? Já troca."""
+    global _musica_atual
+    if _musica_atual in ("menu", "luta") and not _sons.get("_nova_" + _musica_atual)             and (MUSICA_MENU if _musica_atual == "menu" else MUSICAS_LUTA[0]) in _prontas:
+        agora, _musica_atual = _musica_atual, None
+        musica(agora)
+
+
 def musica(nome):
     """Troca a música ('luta', 'menu' ou None pra parar)."""
     global _musica_atual
     if not _iniciar() or nome == _musica_atual:
         return
+    if nome in ("menu", "luta") and not _ja_escolheu[0]:
+        _escolher(nome)  # (luta nova: sorteia a música)
+    _ja_escolheu[0] = False
     try:
         canal = pygame.mixer.Channel(0)
         canal.stop()

@@ -215,6 +215,10 @@ class Computador:
         else:
             bola = ataque = carregando = False
         if livre and (bola or ataque or carregando):
+            b = self.botao(eu, "contra") if ataque else None  # CONTRA-ATAQUE (Inazumaneko): reage ao golpe de perto
+            if b and not ele.golpe.get("proj") and random.random() < 0.5:
+                self.usou[b] = self.relogio
+                return Entrada(5, especial=b)
             if ataque and self.parry_espera <= 0 and random.random() < self.parry:  # tenta o parry
                 self.parry_espera = PARRY_BOT_ESPERA
                 baixo = ele.golpe["nivel"] == "baixo"
@@ -244,8 +248,12 @@ class Computador:
             return Entrada(5)
         if eu.barra >= BARRA_TOTAL and eu.tem_ult2() and dist < 600 and random.random() < 0.3:
             return Entrada(5, especial="Z2")  # 2ª ULTIMATE (a amarela encheu)
-        if eu.barra >= BARRA_MAX and dist < 600 and random.random() < (0.15 if eu.tem_ult2() else 0.3):  # (às vezes espera a amarela)
+        gz = GOLPES.get(eu.f.get("golpes", PADRAO).get("Z", ""), {})
+        alcance_z = gz.get("ia_alcance", 600)  # (ultimate só de perto: Corte Samurai do Inazumaneko)
+        if eu.barra >= BARRA_MAX and dist < alcance_z and random.random() < (0.15 if eu.tem_ult2() else 0.3):  # (às vezes espera a amarela)
             return esp("ultimate")
+        if eu.barra >= BARRA_MAX and alcance_z < 600 and dist >= alcance_z:
+            self.segurando = frente  # (chega perto pra soltar a ultimate)
         x = random.random()
         if dist > 280:
             if x < 0.25:

@@ -51,6 +51,27 @@ POSES_TRAFO = {
                      ct=(38, 30), mt=(52, 4), cf=(42, 30), mf=(30, 2)),
     "t_corre2": dict(pt=(16, 0), jt=(10, 24), pf=(-30, 6), jf=(-14, 26), qd=(0, 46), pc=(30, 52), cb=(48, 60),
                      ct=(42, 30), mt=(30, 2), cf=(38, 30), mf=(52, 4)),
+    # (as poses do meio: deixam os golpes FLUIDOS)
+    "t_lingua_prep": dict(pt=(-22, 0), jt=(-8, 22), pf=(18, 0), jf=(26, 24), qd=(0, 48), pc=(8, 82), cb=(14, 98),
+                          ct=(2, 66), mt=(8, 56), cf=(20, 70), mf=(30, 66)),
+    "t_lingua_puxa": dict(pt=(-24, 0), jt=(-10, 22), pf=(20, 0), jf=(28, 24), qd=(0, 46), pc=(18, 76), cb=(30, 86),
+                          ct=(10, 60), mt=(18, 48), cf=(28, 62), mf=(40, 54)),
+    "t_terra_ergue": dict(pt=(-22, 0), jt=(-8, 22), pf=(20, 0), jf=(28, 24), qd=(0, 48), pc=(14, 82), cb=(24, 96),
+                          ct=(4, 66), mt=(10, 56), cf=(30, 92), mf=(38, 112)),
+    "t_terra_forca": dict(pt=(-24, 0), jt=(-6, 16), pf=(22, 0), jf=(32, 18), qd=(0, 32), pc=(22, 54), cb=(34, 64),
+                          ct=(8, 42), mt=(14, 28), cf=(38, 28), mf=(46, 2)),
+    "t_terra_puxa": dict(pt=(-22, 0), jt=(-6, 20), pf=(20, 0), jf=(30, 22), qd=(0, 40), pc=(18, 68), cb=(30, 80),
+                         ct=(8, 52), mt=(14, 40), cf=(34, 52), mf=(44, 40)),
+    "t_selo_prep": dict(pt=(-20, 0), jt=(-6, 22), pf=(18, 0), jf=(26, 24), qd=(0, 46), pc=(16, 78), cb=(28, 92),
+                        ct=(22, 68), mt=(30, 78), cf=(28, 70), mf=(30, 78)),
+    "t_poder": dict(pt=(-22, 0), jt=(-8, 22), pf=(20, 0), jf=(28, 24), qd=(0, 46), pc=(14, 80), cb=(24, 96),
+                    ct=(-4, 74), mt=(-14, 86), cf=(32, 74), mf=(42, 88)),
+    "t_pulo_estica": dict(pt=(-40, 20), jt=(-22, 34), pf=(-30, 12), jf=(-14, 30), qd=(0, 50), pc=(28, 66), cb=(46, 76),
+                          ct=(34, 64), mt=(58, 66), cf=(40, 68), mf=(64, 72)),
+    "t_pulo_cai": dict(pt=(-14, 0), jt=(-2, 22), pf=(20, 4), jf=(26, 26), qd=(0, 46), pc=(18, 74), cb=(30, 86),
+                       ct=(14, 58), mt=(26, 48), cf=(32, 60), mf=(46, 52)),
+    "t_pouso_forte": dict(pt=(-24, 0), jt=(-6, 14), pf=(22, 0), jf=(34, 14), qd=(0, 24), pc=(20, 46), cb=(32, 54),
+                          ct=(12, 32), mt=(22, 16), cf=(32, 32), mf=(44, 18)),
 }
 proporcionar(POSES_TRAFO)
 
@@ -251,10 +272,18 @@ def pulao(l, outro, jogo):
         m["caixa"] = None
         jogo.tremer(4)
         fumaca(jogo, l.x, CHAO - 4, 8, (150, 130, 100), 3, -1)
+    if t > P_SAI + 2 and l.vy > 0 and "topo" not in m:  # passou do ponto mais alto: começa a cair
+        m["topo"] = t
+    ar = [(0, "t_agacha"), (P_SAI, "t_pulo_estica"), (P_SAI + 8, "t_pulo")]
+    if "topo" in m:
+        ar.append((max(P_SAI + 9, m["topo"] + 4), "t_pulo_cai"))
     if "pousou" in m:
         l.vx *= 0.7
-        m["quadros"] = [(0, "t_agacha"), (P_SAI, "t_pulo"), (m["pousou"], "t_agacha"),
-                        (m["pousou"] + P_POUSO_REC, "parado")]
+        u = m["pousou"]
+        m["quadros"] = [q for q in ar if q[0] < u] + [(u, "t_pouso_forte"), (u + 6, "t_agacha"),
+                                                    (u + P_POUSO_REC, "parado")]
+    else:
+        m["quadros"] = ar + [(999, ar[-1][1])]
     l.fisica(jogo)
     if "pousou" in m and t >= m["pousou"] + P_POUSO_REC:
         return "fim"
@@ -567,11 +596,14 @@ def _registra(nome, **g):
 
 _registra("trafo_lingua", ini=L_SAI + 1, ativo=L_VOLTA - L_SAI, rec=L_FIM - L_VOLTA, janelas=((L_SAI + 1, L_VOLTA + 2),),
           dano=10, hit=20, defe=14, emp=0, nivel="medio", paralisa=120, logica=linguao, efeito=linguao_efeito,
-          ia="longe", quadros=[(0, "parado"), (L_SAI - 3, "t_lingua"), (L_VOLTA + 4, "t_lingua"), (L_FIM, "parado")])
+          ia="longe", quadros=[(0, "parado"), (5, "t_lingua_prep"), (L_SAI - 3, "t_lingua_prep"), (L_SAI, "t_lingua"),
+                               (L_VOLTA, "t_lingua"), (L_VOLTA + 6, "t_lingua_puxa"), (L_FIM, "parado")])
 _registra("trafo_terra", ini=T_SAI, ativo=T_SOME - T_SAI, rec=T_FIM - T_SOME, janelas=((T_SAI + 1, T_SAI + 9),),
           dano=20, hit=20, defe=12, emp=1, nivel="medio", imbloqueavel=True, lanca=17, logica=terra,
           efeito=terra_efeito, ia="longe",
-          quadros=[(0, "parado"), (T_ENFIA, "t_terra"), (T_SOME, "t_terra"), (T_FIM, "parado")])
+          quadros=[(0, "parado"), (5, "t_terra_ergue"), (T_ENFIA, "t_terra"), (T_SAI - 4, "t_terra"),
+                   (T_SAI, "t_terra_forca"), (T_SOME, "t_terra_forca"), (T_SOME + 8, "t_terra_puxa"),
+                   (T_FIM, "parado")])
 _registra("trafo_tiro_olho", ini=0, ativo=1, rec=0, dano=4, hit=10, defe=8, emp=2, nivel="medio", proj=True,
           raio=6, vel=11, desenho_proj=desenha_tiro_olho)
 _registra("trafo_olhos", ini=O_ATIRA, ativo=O_TIROS * O_INTERVALO, rec=O_FIM - O_ATIRA - O_TIROS * O_INTERVALO,
@@ -579,11 +611,12 @@ _registra("trafo_olhos", ini=O_ATIRA, ativo=O_TIROS * O_INTERVALO, rec=O_FIM - O
           quadros=[(0, "parado"), (O_NASCE, "t_olhos"), (O_SOME, "t_olhos"), (O_FIM, "parado")])
 _registra("trafo_transforma", ini=X_PUF, ativo=1, rec=X_FIM - X_PUF, dano=0, hit=0, defe=0, emp=0, nivel="medio",
           logica=transforma, ia="medio",
-          quadros=[(0, "parado"), (X_VIRA - 2, "t_agacha"), (X_VIRA, "parado"), (X_FIM, "parado")])
+          quadros=[(0, "parado"), (3, "t_selo_prep"), (X_VIRA - 1, "t_agacha"), (X_PUF, "t_agacha"),
+                   (X_PUF + 4, "t_poder"), (X_FIM - 2, "t_poder"), (X_FIM, "parado")])
 GOLPES["trafo_transforma"]["total"] = X_FIM + 1
 _registra("trafo_pulo", ini=P_SAI, ativo=30, rec=P_POUSO_REC, janelas=((P_SAI + 2, 120),), caixa=(-10, 20, 54, 100),
           dano=10, hit=20, defe=12, emp=6, nivel="alto", derruba=True, voo=(6, 8), logica=pulao, ia="medio",
-          quadros=[(0, "t_agacha"), (P_SAI, "t_pulo"), (120, "t_pulo")])
+          quadros=[(0, "t_agacha"), (P_SAI, "t_pulo_estica"), (P_SAI + 8, "t_pulo"), (120, "t_pulo")])
 _registra("trafo_ultimate", ini=U_SAI, ativo=U_CORRE_ATE - U_SAI, rec=30, janelas=((U_SAI, U_CORRE_ATE),),
           dano=0, hit=60, defe=20, emp=0, nivel="medio", ultimate=True, logica=ultimate, efeito=ultimate_efeito,
           ia="ultimate", quadros=ultimate_quadros())

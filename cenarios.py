@@ -1116,6 +1116,317 @@ class MontanhaNevada(Base):
             pygame.draw.circle(tela, (255, 255, 255), (int(x / px), int(f[1] / px)), max(1, int(2 / px)))
 
 
+# =====================================================================
+# MONTE KARASUMA (Inazumaneko, v3.0): o alto de uma montanha SEM neve, acima das nuvens, onde fica o CAMPO DE
+# TREINAMENTO dele: o chão de terra batida, os bonecos de palha cortados, a cerca de bambu, o portal vermelho,
+# os estandartes e as árvores de folha vermelha (as folhas caindo)
+# =====================================================================
+class MonteKarasuma(Base):
+    nome = "MONTE KARASUMA"
+
+    def _fundo(self):
+        sup = pygame.Surface((LARGURA, ALTURA))
+        _degrade(sup, (0, 0, LARGURA, 300), (96, 150, 210), (250, 214, 170))  # céu de fim de tarde, bem alto
+        _brilho(sup, (700, 150), 90, (255, 240, 200), 120)
+        pygame.draw.circle(sup, (255, 246, 214), (700, 150), 34)  # o sol
+        # os PICOS de rocha lá longe (montanhas pontudas, sem neve)
+        for cor, pts in (((140, 130, 150), [(-40, 300), (90, 150), (160, 210), (240, 120), (360, 300)]),
+                         ((150, 138, 156), [(560, 300), (690, 180), (760, 230), (860, 110), (1000, 300)])):
+            pygame.draw.polygon(sup, cor, pts)
+            for i in range(len(pts) - 2):  # (o lado da sombra)
+                a, b = pts[i + 1], pts[i + 2]
+                if b[1] > a[1]:
+                    pygame.draw.polygon(sup, tuple(int(v * 0.82) for v in cor), [a, b, (a[0] + 10, 300)])
+        # o MAR DE NUVENS (estamos acima delas)
+        rnd = random.Random(41)
+        for i in range(22):
+            x = rnd.uniform(-60, LARGURA)
+            y = rnd.uniform(250, 300)
+            pygame.draw.ellipse(sup, (252, 236, 226), (x, y, rnd.uniform(90, 180), rnd.uniform(26, 44)))
+        _degrade(sup, (0, 290, LARGURA, 20), (250, 232, 222), (240, 220, 210))
+        # o CUME onde fica o campo (a rocha verde-musgo, com degraus)
+        topo = [(0, 330), (120, 310), (260, 318), (420, 300), (600, 312), (780, 302), (960, 320), (960, CHAO), (0, CHAO)]
+        pygame.draw.polygon(sup, (92, 112, 80), topo)
+        _degrade(sup, (0, 340, LARGURA, CHAO - 340), (104, 124, 88), (84, 96, 70))
+        for i in range(14):  # as pedras da encosta
+            x, y = rnd.uniform(0, LARGURA), rnd.uniform(330, CHAO - 60)
+            pygame.draw.ellipse(sup, (120, 120, 112), (x, y, rnd.uniform(24, 60), rnd.uniform(10, 22)))
+        # as ÁRVORES de folha vermelha (bordos) dos lados
+        for x, base, h in ((70, CHAO - 40, 170), (900, CHAO - 50, 150), (230, 330, 90), (820, 326, 80)):
+            pygame.draw.line(sup, (70, 44, 34), (x, base), (x - 6, base - h * 0.6), max(4, int(h / 14)))
+            pygame.draw.line(sup, (70, 44, 34), (x - 4, base - h * 0.4), (x + h * 0.25, base - h * 0.7), max(3, int(h / 20)))
+            for k in range(7):
+                a = k * math.tau / 7
+                pygame.draw.circle(sup, (200 - k % 3 * 20, 50 + k % 2 * 20, 40),
+                                   (int(x + math.cos(a) * h * 0.26), int(base - h * 0.72 + math.sin(a) * h * 0.18)), int(h * 0.2))
+        # o PORTAL vermelho (torii) no fundo do campo
+        tx, tb = 480, CHAO - 120
+        for dx in (-70, 70):
+            pygame.draw.rect(sup, (60, 20, 20), (tx + dx - 9, tb - 120, 18, 124))
+            pygame.draw.rect(sup, (200, 50, 40), (tx + dx - 7, tb - 118, 14, 120))
+        pygame.draw.polygon(sup, (60, 20, 20), [(tx - 112, tb - 132), (tx + 112, tb - 132), (tx + 100, tb - 120), (tx - 100, tb - 120)])
+        pygame.draw.polygon(sup, (40, 30, 30), [(tx - 118, tb - 142), (tx + 118, tb - 142), (tx + 110, tb - 132), (tx - 110, tb - 132)])
+        pygame.draw.rect(sup, (200, 50, 40), (tx - 92, tb - 108, 184, 10))
+        pygame.draw.rect(sup, (40, 30, 30), (tx - 14, tb - 132, 28, 24))  # a plaquinha do meio (sem letras)
+        pygame.draw.rect(sup, (220, 190, 110), (tx - 10, tb - 128, 20, 16))
+        # os ESTANDARTES (bandeiras compridas com o símbolo do raio)
+        for bx in (300, 660):
+            pygame.draw.line(sup, (60, 40, 30), (bx, CHAO), (bx, CHAO - 210), 5)
+            pygame.draw.rect(sup, (40, 30, 70), (bx + 3, CHAO - 206, 30, 110))
+            pygame.draw.polygon(sup, (250, 210, 70), [(bx + 22, CHAO - 190), (bx + 12, CHAO - 158), (bx + 20, CHAO - 158),
+                                                      (bx + 10, CHAO - 126), (bx + 26, CHAO - 166), (bx + 18, CHAO - 166)])
+        # a CERCA DE BAMBU no fundo do campo
+        for i in range(30):
+            x = 120 + i * 24
+            if 400 < x < 560:
+                continue  # (o portal)
+            pygame.draw.rect(sup, (150, 160, 80), (x, CHAO - 70, 9, 70))
+            pygame.draw.line(sup, (110, 120, 56), (x, CHAO - 46), (x + 9, CHAO - 46), 2)
+        pygame.draw.line(sup, (110, 120, 56), (120, CHAO - 60), (840, CHAO - 60), 4)
+        # os BONECOS DE PALHA de treino (cortados em diagonal)
+        for bx, alto in ((170, 96), (360, 80), (610, 88)):
+            pygame.draw.line(sup, (90, 60, 30), (bx, CHAO), (bx, CHAO - alto - 20), 5)
+            pygame.draw.rect(sup, (200, 170, 90), (bx - 12, CHAO - alto, 24, alto - 6), border_radius=6)
+            for k in range(3):
+                pygame.draw.line(sup, (150, 110, 50), (bx - 12, CHAO - alto + 14 + k * 20), (bx + 12, CHAO - alto + 14 + k * 20), 3)
+            pygame.draw.line(sup, (90, 50, 30), (bx - 14, CHAO - alto + 8), (bx + 14, CHAO - alto + 30), 2)  # o corte
+        # o CHÃO de terra batida do campo (com as marcas de passos e as pedras da borda)
+        _degrade(sup, (0, CHAO, LARGURA, ALTURA - CHAO), (176, 146, 106), (130, 104, 74))
+        pygame.draw.line(sup, (96, 74, 50), (0, CHAO), (LARGURA, CHAO), 3)
+        for i in range(16):
+            x = rnd.uniform(0, LARGURA)
+            pygame.draw.ellipse(sup, (150, 122, 86), (x, CHAO + rnd.uniform(8, 44), rnd.uniform(30, 70), 8))
+        for x in range(0, LARGURA, 64):  # as pedras da borda
+            pygame.draw.ellipse(sup, (120, 112, 100), (x + rnd.uniform(-6, 6), CHAO - 6, 40, 12))
+        return sup
+
+    def __init__(self):
+        super().__init__()
+        rnd = random.Random(42)
+        self.folhas = [[rnd.uniform(0, LARGURA), rnd.uniform(0, ALTURA), rnd.uniform(0.5, 1.2), rnd.uniform(0, 6)]
+                       for _ in range(26)]
+
+    def animar(self, tela, t, px):
+        for f in self.folhas:  # as FOLHAS VERMELHAS caindo, girando
+            f[1] = (f[1] + f[2]) % ALTURA
+            x = (f[0] + math.sin(t * 0.025 + f[3]) * 30 + t * 0.3) % LARGURA
+            a = t * 0.08 + f[3]
+            r = max(1, int(4 / px))
+            cx, cy = x / px, f[1] / px
+            pygame.draw.polygon(tela, (210, 70, 40), [(cx + math.cos(a) * r * 1.6, cy + math.sin(a) * r * 0.6),
+                                                      (cx - math.sin(a) * r * 0.6, cy + math.cos(a) * r),
+                                                      (cx - math.cos(a) * r * 1.6, cy - math.sin(a) * r * 0.6),
+                                                      (cx + math.sin(a) * r * 0.6, cy - math.cos(a) * r)])
+
+
+# =====================================================================
+# CAVERNA DOS MORCEGOS (Nocturnus, v3.0): uma caverna funda e escura — estalactites no teto com MORCEGOS pendurados
+# (balançando, piscando os olhinhos), CRISTAIS ROXOS brilhando nas paredes, poças que refletem, e a luz fraquinha
+# que entra por uma fresta lá no alto
+# =====================================================================
+class CavernaMorcegos(Base):
+    nome = "CAVERNA DOS MORCEGOS"
+
+    def _fundo(self):
+        sup = pygame.Surface((LARGURA, ALTURA))
+        _degrade(sup, (0, 0, LARGURA, ALTURA), (14, 10, 24), (40, 28, 52))
+        rnd = random.Random(51)
+        # a FRESTA lá no alto (o feixe de luz da lua entrando)
+        pygame.draw.polygon(sup, (60, 70, 110), [(560, 0), (610, 0), (700, CHAO), (470, CHAO)])
+        _brilho(sup, (585, 10), 60, (150, 170, 230), 120)
+        # as PAREDES de rocha do fundo (camadas)
+        for cor, base_y, n in (((34, 26, 46), 260, 9), ((46, 34, 58), 330, 7)):
+            pts = [(0, ALTURA), (0, base_y)]
+            for i in range(n + 1):
+                pts.append((i * LARGURA / n, base_y + rnd.uniform(-60, 40)))
+            pts += [(LARGURA, base_y), (LARGURA, ALTURA)]
+            pygame.draw.polygon(sup, cor, pts)
+        # os CRISTAIS ROXOS (aglomerados brilhando nas paredes)
+        for cx, cy, tam in ((110, 330, 1.2), (300, 380, 0.8), (720, 360, 1.0), (880, 300, 1.3), (500, 400, 0.6)):
+            _brilho(sup, (cx, cy - 20 * tam), int(70 * tam), (170, 90, 230), 90)
+            for k in range(5):
+                a = -math.pi / 2 + (k - 2) * 0.35
+                h = (40 + (k % 2) * 22) * tam
+                bx, by = cx + (k - 2) * 9 * tam, cy
+                pts = [(bx - 7 * tam, by), (bx + math.cos(a) * h - 4 * tam, by + math.sin(a) * h),
+                       (bx + math.cos(a) * (h + 10 * tam), by + math.sin(a) * (h + 10 * tam)),
+                       (bx + math.cos(a) * h + 4 * tam, by + math.sin(a) * h), (bx + 7 * tam, by)]
+                pygame.draw.polygon(sup, (120, 60, 180), pts)
+                pygame.draw.polygon(sup, (200, 150, 255), pts[1:4])
+        # o TETO com as ESTALACTITES
+        pygame.draw.rect(sup, (20, 14, 30), (0, 0, LARGURA, 50))
+        for i in range(24):
+            x = i * 42 + rnd.uniform(-10, 10)
+            h = rnd.uniform(40, 130)
+            pygame.draw.polygon(sup, (30, 22, 42), [(x - 18, 40), (x + 18, 40), (x + 2, 40 + h)])
+            pygame.draw.polygon(sup, (44, 34, 58), [(x - 6, 40), (x + 4, 40), (x + 2, 40 + h * 0.8)])
+        # as ESTALAGMITES no chão (dos lados)
+        for x, h in ((40, 110), (90, 70), (870, 120), (930, 80), (250, 50), (760, 60)):
+            pygame.draw.polygon(sup, (36, 28, 48), [(x - 26, CHAO), (x + 26, CHAO), (x + 3, CHAO - h)])
+            pygame.draw.polygon(sup, (54, 42, 68), [(x - 6, CHAO), (x + 6, CHAO), (x + 2, CHAO - h * 0.8)])
+        # o CHÃO de pedra úmida, com as POÇAS refletindo
+        _degrade(sup, (0, CHAO, LARGURA, ALTURA - CHAO), (52, 42, 62), (26, 20, 34))
+        pygame.draw.line(sup, (70, 58, 84), (0, CHAO), (LARGURA, CHAO), 3)
+        for x, w in ((180, 120), (620, 160), (420, 80)):
+            pygame.draw.ellipse(sup, (40, 50, 90), (x, CHAO + 14, w, 16))
+            pygame.draw.ellipse(sup, (90, 110, 170), (x + w * 0.2, CHAO + 17, w * 0.4, 4))
+        for i in range(14):  # as pedrinhas
+            pygame.draw.ellipse(sup, (66, 56, 78), (rnd.uniform(0, LARGURA), CHAO + rnd.uniform(6, 48), rnd.uniform(10, 26), 6))
+        return sup
+
+    def __init__(self):
+        super().__init__()
+        rnd = random.Random(52)
+        self.morcegos = [(rnd.uniform(30, LARGURA - 30), rnd.uniform(44, 70), rnd.uniform(0, 6)) for _ in range(9)]
+        self.gotas = [[rnd.uniform(0, LARGURA), rnd.uniform(0, 300), rnd.uniform(0, 200)] for _ in range(6)]
+
+    def animar(self, tela, t, px):
+        for x, y, f in self.morcegos:  # os MORCEGOS pendurados no teto (de cabeça pra baixo, balançando)
+            bx = x + math.sin(t * 0.04 + f) * 2
+            cx, cy = bx / px, y / px
+            r = max(1, 5 / px)
+            pygame.draw.line(tela, (20, 14, 26), (cx, cy - 6 / px), (cx, cy), max(1, int(1 / px)))
+            pygame.draw.ellipse(tela, (16, 10, 22), (cx - r, cy, r * 2, r * 2.6))
+            if (t // 40 + int(f * 10)) % 7:  # os olhinhos (às vezes piscam)
+                pygame.draw.circle(tela, (255, 70, 70), (int(cx - r * 0.4), int(cy + r * 1.9)), max(1, int(1 / px)))
+                pygame.draw.circle(tela, (255, 70, 70), (int(cx + r * 0.4), int(cy + r * 1.9)), max(1, int(1 / px)))
+        for g in self.gotas:  # as GOTAS pingando do teto
+            u = (t + g[2]) % 160
+            if u < 60:
+                pygame.draw.circle(tela, (150, 170, 220), (int(g[0] / px), int((90 + u * (CHAO - 90) / 60) / px)), max(1, int(2 / px)))
+
+
+# =====================================================================
+# FLORESTA ANTIGA (Silvanus, v3.0): árvores GIGANTES (troncos largos com raízes enormes), RAIOS DE SOL entrando
+# pela copa, e RUÍNAS cobertas de musgo (um arco quebrado e pilares) com RUNAS que brilham devagar
+# =====================================================================
+RUNAS_FLORESTA = ((392, 300), (568, 300), (480, 236), (120, 462), (790, 457))  # (onde as runas acendem)
+
+
+def _runa(sup, x, y, tam, cor, larg=2):
+    """Uma runa simples (traços retos, tipo letra antiga)."""
+    pygame.draw.line(sup, cor, (x, y - tam), (x, y + tam), larg)
+    pygame.draw.line(sup, cor, (x, y - tam * 0.4), (x + tam * 0.6, y - tam), larg)
+    pygame.draw.line(sup, cor, (x, y + tam * 0.1), (x - tam * 0.6, y - tam * 0.5), larg)
+
+
+class FlorestaAntiga(Base):
+    nome = "FLORESTA ANTIGA"
+
+    def _fundo(self):
+        sup = pygame.Surface((LARGURA, ALTURA))
+        _degrade(sup, (0, 0, LARGURA, CHAO), (150, 190, 120), (34, 66, 44))  # a luz verde-dourada lá de cima
+        rnd = random.Random(61)
+        # as árvores do FUNDO (troncos enormes, apagados pela névoa)
+        for x, w, cor in ((60, 70, (92, 124, 92)), (250, 54, (96, 128, 96)), (700, 60, (92, 124, 92)),
+                          (900, 80, (88, 120, 88)), (470, 40, (100, 134, 100))):
+            pygame.draw.rect(sup, cor, (x - w / 2, 0, w, CHAO))
+            pygame.draw.polygon(sup, cor, [(x - w / 2 - 30, CHAO), (x - w / 2, CHAO - 60), (x + w / 2, CHAO - 60),
+                                           (x + w / 2 + 30, CHAO)])
+        # a COPA (folhagem lá no alto, escura, com buracos de luz)
+        for i in range(30):
+            cx, cy = rnd.uniform(-40, LARGURA + 40), rnd.uniform(-30, 70)
+            pygame.draw.circle(sup, (30, 62, 36), (int(cx), int(cy)), int(rnd.uniform(40, 80)))
+        for i in range(10):
+            pygame.draw.circle(sup, (44, 84, 46), (int(rnd.uniform(0, LARGURA)), int(rnd.uniform(40, 100))),
+                               int(rnd.uniform(26, 50)))
+        # as RUÍNAS: o ARCO de pedra quebrado no meio, os pilares e os blocos caídos (tudo com musgo)
+        pedra, sombra, musgo = (128, 132, 116), (88, 92, 80), (70, 120, 52)
+        for px_, topo in ((392, 220), (568, 250)):  # os dois pilares do arco
+            pygame.draw.rect(sup, sombra, (px_ - 34, topo, 68, CHAO - topo))
+            pygame.draw.rect(sup, pedra, (px_ - 28, topo, 56, CHAO - topo))
+            for k in range(int((CHAO - topo) / 36)):  # as pedras (as juntas)
+                pygame.draw.line(sup, sombra, (px_ - 28, topo + k * 36), (px_ + 28, topo + k * 36), 2)
+        for cor, r_fora, r_dentro in ((sombra, 122, 82), (pedra, 116, 88)):  # o ARCO (quebrou antes de chegar no pilar direito)
+            fora = [(480 + math.cos(a) * r_fora, 232 - math.sin(a) * r_fora * 0.8) for a in
+                    [math.pi - k * (math.pi - 0.75) / 16 for k in range(17)]]
+            dentro = [(480 + math.cos(a) * r_dentro, 232 - math.sin(a) * r_dentro * 0.8) for a in
+                      [0.75 + k * (math.pi - 0.75) / 16 for k in range(17)]]
+            quebra = [(fora[-1][0] - 4, fora[-1][1] + 8), (fora[-1][0] + 6, fora[-1][1] + 16)]  # a ponta lascada
+            pygame.draw.polygon(sup, cor, fora + quebra + dentro)
+        for k in range(1, 6):  # as juntas das pedras do arco
+            a = math.pi - k * (math.pi - 0.75) / 6
+            pygame.draw.line(sup, sombra, (480 + math.cos(a) * 88, 232 - math.sin(a) * 70),
+                             (480 + math.cos(a) * 116, 232 - math.sin(a) * 93), 2)
+        for x, y, w, h in ((340, 214, 110, 16), (520, 246, 90, 12), (370, 300, 40, 50), (600, 330, 30, 60)):  # o musgo
+            pygame.draw.ellipse(sup, musgo, (x, y, w, h))
+        for x, w, h in ((120, 70, 40), (790, 64, 50), (660, 40, 22)):  # os blocos caídos
+            pygame.draw.rect(sup, sombra, (x - w / 2, CHAO - h, w, h), border_radius=6)
+            pygame.draw.rect(sup, pedra, (x - w / 2 + 4, CHAO - h + 4, w - 8, h - 8), border_radius=4)
+            pygame.draw.ellipse(sup, musgo, (x - w / 2, CHAO - h - 6, w, 14))
+        for x, y in RUNAS_FLORESTA:  # as runas apagadas (o brilho é no animar)
+            _runa(sup, x, y, 12, (80, 96, 80), 3)
+        # as ÁRVORES GIGANTES da frente (dos lados), com RAÍZES enormes
+        for x, w, lado in ((-10, 150, 1), (LARGURA + 10, 170, -1)):
+            casca, escura, clara = (78, 58, 40), (50, 36, 26), (104, 80, 56)
+            pygame.draw.rect(sup, escura, (x - w / 2, 0, w, CHAO))
+            pygame.draw.rect(sup, casca, (x - w / 2 + 8, 0, w - 16, CHAO))
+            for k in range(5):  # as rugas da casca
+                gx = x - w / 2 + 20 + k * (w - 40) / 4
+                pygame.draw.line(sup, escura, (gx, 0), (gx + rnd.uniform(-10, 10), CHAO), 3)
+            pygame.draw.line(sup, clara, (x + lado * (w / 2 - 14), 0), (x + lado * (w / 2 - 14), CHAO), 4)
+            for k in range(3):  # as raízes saindo pro chão
+                rx = x + lado * (w / 2 + 10 + k * 46)
+                pygame.draw.polygon(sup, escura, [(x + lado * (w / 2 - 20), CHAO - 120 + k * 30), (rx + lado * 40, CHAO),
+                                                  (rx - lado * 10, CHAO)])
+                pygame.draw.polygon(sup, casca, [(x + lado * (w / 2 - 20), CHAO - 112 + k * 30), (rx + lado * 30, CHAO),
+                                                 (rx, CHAO)])
+            for k in range(4):  # musgo no tronco
+                pygame.draw.ellipse(sup, musgo, (x - w / 2 + rnd.uniform(0, w - 40), rnd.uniform(100, 400), 40, 16))
+        # os RAIOS DE SOL entrando pela copa (faixas de luz transparentes)
+        luz = pygame.Surface((LARGURA, ALTURA), pygame.SRCALPHA)
+        for x0, larg in ((300, 60), (470, 40), (640, 80), (760, 34)):
+            pygame.draw.polygon(luz, (255, 240, 170, 44), [(x0, 0), (x0 + larg, 0), (x0 + larg - 150, CHAO),
+                                                          (x0 - 190, CHAO)])
+        sup.blit(luz, (0, 0))
+        # o CHÃO da floresta: terra escura com musgo, samambaias e cogumelos
+        _degrade(sup, (0, CHAO, LARGURA, ALTURA - CHAO), (60, 92, 44), (30, 46, 26))
+        pygame.draw.line(sup, (90, 132, 60), (0, CHAO), (LARGURA, CHAO), 3)
+        for i in range(26):  # tufos de musgo
+            pygame.draw.ellipse(sup, (76, 120, 52), (rnd.uniform(0, LARGURA), CHAO + rnd.uniform(4, 44),
+                                                     rnd.uniform(16, 40), 8))
+        for x in (40, 230, 330, 620, 720, 930):  # as samambaias
+            for k in range(5):
+                a = math.pi + 0.35 + k * 0.6
+                pygame.draw.line(sup, (54, 104, 46), (x, CHAO + 2), (x + math.cos(a) * 34, CHAO + 2 + math.sin(a) * 26), 4)
+        for x, cor in ((260, (200, 70, 50)), (276, (220, 90, 60)), (700, (230, 200, 140)), (850, (200, 70, 50))):  # cogumelos
+            pygame.draw.rect(sup, (230, 224, 200), (x - 2, CHAO - 12, 5, 12))
+            pygame.draw.ellipse(sup, cor, (x - 9, CHAO - 18, 19, 10))
+            pygame.draw.circle(sup, (250, 246, 230), (x - 3, CHAO - 14), 2)
+        return sup
+
+    def __init__(self):
+        super().__init__()
+        rnd = random.Random(62)
+        self.poeira = [[rnd.uniform(200, 800), rnd.uniform(60, CHAO - 20), rnd.uniform(0, 6)] for _ in range(26)]
+        self.folhas = [[rnd.uniform(0, LARGURA), rnd.uniform(0, ALTURA), rnd.uniform(0.5, 1.1), rnd.uniform(0, 6)]
+                       for _ in range(6)]
+
+    def animar(self, tela, t, px):
+        for i, (x, y) in enumerate(RUNAS_FLORESTA):  # as RUNAS acendendo e apagando devagar (uma de cada vez)
+            k = max(0.0, math.sin(t * 0.025 - i * 1.3))
+            if k > 0.05:
+                cor = (int(80 + 120 * k), int(96 + 159 * k), int(80 + 120 * k))
+                pygame.draw.circle(tela, mistura_cor((70, 90, 70), (120, 220, 140), k), (int(x / px), int(y / px)),
+                                   max(1, int(17 / px)), max(1, int(2 / px)))  # o círculo de luz em volta
+                _runa(tela, x / px, y / px, 12 / px, cor, max(1, int(3 / px)))
+        for p in self.poeira:  # o PÓ DE LUZ flutuando dentro dos raios de sol
+            x = p[0] + math.sin(t * 0.01 + p[2]) * 30
+            y = (p[1] - t * 0.15) % (CHAO - 60) + 40
+            if (t // 20 + int(p[2] * 7)) % 5:
+                pygame.draw.circle(tela, (255, 246, 190), (int(x / px), int(y / px)), max(1, int(2 / px)))
+        for f in self.folhas:  # as FOLHAS caindo devagar, girando
+            f[1] = (f[1] + f[2]) % ALTURA
+            x = (f[0] + math.sin(t * 0.02 + f[3]) * 40) % LARGURA
+            a = t * 0.06 + f[3]
+            r = max(1, int(4 / px))
+            cx, cy = x / px, f[1] / px
+            pygame.draw.polygon(tela, (110, 160, 60), [(cx + math.cos(a) * r * 1.6, cy + math.sin(a) * r * 0.6),
+                                                       (cx - math.sin(a) * r * 0.6, cy + math.cos(a) * r),
+                                                       (cx - math.cos(a) * r * 1.6, cy - math.sin(a) * r * 0.6),
+                                                       (cx + math.sin(a) * r * 0.6, cy - math.cos(a) * r)])
+
+
 SECRETOS = {"VILA DOS SAPOS": "ULTRA-MEGA-VILLAGE"}  # cenário: código que libera
 
 
@@ -1130,7 +1441,8 @@ CENARIOS = {"TEMPLO": Templo, "PÂNTANO": Pantano, "FERRO-VELHO": FerroVelho, "T
             "CAMPO DE BATALHA": CampoBatalha, "TORRE DO MAGO": TorreMago, "CASSINO": Cassino, "LABORATÓRIO": Laboratorio, "ARENA DE SUMÔ": ArenaSumo, "SELVA": Selva,
             "VILA DOS SAPOS": VilaSapos, "TEATRO DE MÁGICA": Teatro,
             "NAVIO FANTASMA": NavioFantasma, "CERCADO DO DESERTO": CercadoDeserto,
-            "PRAIA DA ILHA": PraiaIlha, "MONTANHA NEVADA": MontanhaNevada}
+            "PRAIA DA ILHA": PraiaIlha, "MONTANHA NEVADA": MontanhaNevada, "MONTE KARASUMA": MonteKarasuma,
+            "CAVERNA DOS MORCEGOS": CavernaMorcegos, "FLORESTA ANTIGA": FlorestaAntiga}
 _prontos = {}
 
 

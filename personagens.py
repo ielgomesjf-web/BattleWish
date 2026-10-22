@@ -34,6 +34,9 @@ import craquen
 import magnus
 import sphyrus
 import frigantus
+import inazumaneko
+import nocturnus
+import silvanus
 from kun import entrada as entrada_kun
 from kun import entrada_efeito as entrada_efeito_kun
 from kun import figura_extra as figura_kun
@@ -199,10 +202,39 @@ PERSONAGENS = [
          nomes={"E": "bola de neve (congela)", "Q": "pisão + estacas de gelo (joga pra cima)",
                 "R": "bloco de gelo: 8 estacas na cabeça", "SHIFT": "escorregão de barriga",
                 "Z": "AVALANCHE", "Z2": "ERA DO GELO"}),
+    dict(nome="INAZUMANEKO", cor=(242, 242, 238), vida=100, vel=3.9, pulo=16.5, forca=0.84, tam=1.38,
+         cor_poder=(170, 220, 255), desenho=inazumaneko.desenhar_inazumaneko, golpes=inazumaneko.GOLPES_INAZUMANEKO,
+         poses=inazumaneko.POSES_INAZUMANEKO, figura_extra=inazumaneko.figura_extra, todo_quadro=inazumaneko.todo_quadro,
+         provocacao="O VENTO CORTA.",
+         provocacao_quadros=[(0, "parado"), (8, "i_equilibra"), (58, "i_equilibra"), (68, "parado")],
+         cenario="MONTE KARASUMA", habilidade="furia_samurai", habilidades_opcoes=("furia_samurai", "poder_samurai"),
+         retrato_zoom=0.62, retrato_dy=14,
+         entrada=inazumaneko.entrada, entrada_efeito=inazumaneko.entrada_efeito, vitoria=inazumaneko.vitoria,
+         vitoria_efeito=inazumaneko.vitoria_efeito, nomes=dict(inazumaneko.NOMES)),
+    dict(nome="NOCTURNUS", cor=(38, 28, 50), vida=100, vel=3.8, pulo=16.5, forca=0.75, barra_mult=0.5, tam=1.38,
+         cor_poder=(150, 210, 255), desenho=nocturnus.desenhar_nocturnus, golpes=nocturnus.GOLPES_NOCTURNUS,
+         poses=nocturnus.POSES_NOCTURNUS, todo_quadro=nocturnus.todo_quadro, tecla_x=nocturnus.tecla_x,
+         desenhar_sempre=nocturnus.desenhar_sempre, efeito_tela=nocturnus.efeito_tela,
+         entrada=nocturnus.entrada, entrada_efeito=nocturnus.entrada_efeito,
+         vitoria=nocturnus.vitoria, vitoria_efeito=nocturnus.vitoria_efeito, nomes=dict(nocturnus.NOMES),
+         habilidade="eco", habilidades_opcoes=("eco", "planar", "senso"), provocacao="*IIIIII!*",
+         provocacao_quadros=[(0, "parado"), (8, "n_grito"), (30, "n_grito"), (36, "n_ri"), (60, "n_ri"), (68, "parado")],
+         cenario="CAVERNA DOS MORCEGOS"),
+    dict(nome="SILVANUS", cor=(72, 150, 60), vida=100, vel=3.6, pulo=16.0, forca=0.8, barra_mult=0.7, tam=1.36,
+         cor_poder=(214, 255, 120),
+         desenho=silvanus.desenhar_silvanus, golpes=silvanus.GOLPES_SILVANUS, poses=silvanus.POSES_SILVANUS,
+         todo_quadro=silvanus.todo_quadro, tecla_x=silvanus.tecla_x, desenhar_sempre=silvanus.desenhar_sempre,
+         entrada=silvanus.entrada, entrada_efeito=silvanus.entrada_efeito,
+         vitoria=silvanus.vitoria, vitoria_efeito=silvanus.vitoria_efeito, vitoria_atras=silvanus.vitoria_atras,
+         provocacao_quadros=silvanus.PROVOCACAO_QUADROS, nomes=dict(silvanus.NOMES),
+         habilidade="jardim", habilidades_opcoes=("jardim", "enganador", "vantagem"), cenario="FLORESTA ANTIGA"),
 ]
 
 
 import ult2  # noqa: E402
+ult2._registra("inaz_ult2", inazumaneko.mil_cortes, inazumaneko.mil_cortes_efeito, [(0, "parado")])  # (MIL CORTES)
+ult2._registra("noct_ult2", nocturnus.cancao, nocturnus.cancao_efeito, [(0, "parado")])  # (CANÇÃO DE NINAR)
+ult2._registra("silv_ult2", silvanus.chuva, silvanus.chuva_efeito, [(0, "parado")])  # (CHUVA DE SEMENTES)
 ult2.ligar(PERSONAGENS)  # as 2ª ULTIMATES (botão "Z2")
 import provocacoes_loja  # noqa: E402,F401  (as provocações da LOJA)
 import vitorias_loja  # noqa: E402,F401  (as poses de vitória da LOJA)
@@ -216,7 +248,7 @@ SECRETOS = [RIBBAT]
 
 
 # ENTRADA (v2.0): a pose em que cada um espera pra falar (o Rib faz o selo de mão, o Tai joga o sal...)
-ESPERA = {'MAX-10': 'vitoria', 'RIB': 'r_selo', 'TRAFO': 't_agacha', 'KING RIP': 'k_bastao', 'CANNAN': 'c_continencia', 'FINN': 'f_carrega', 'KUN': 'k_brinca', 'TROMOS': 'x_vitoria', 'TAI': 't_sal', 'TAMER': 't_carinho', 'JOHN': 'j_agradece', 'CRÁQUEN': 'q_espera', 'MAGNUS': 'm_fareja', 'SPHYRUS': 's_ruge', 'FRIGANTUS': 'fr_peito_a'}
+ESPERA = {'MAX-10': 'vitoria', 'RIB': 'r_selo', 'TRAFO': 't_agacha', 'KING RIP': 'k_bastao', 'CANNAN': 'c_continencia', 'FINN': 'f_carrega', 'KUN': 'k_brinca', 'TROMOS': 'x_vitoria', 'TAI': 't_sal', 'TAMER': 't_carinho', 'JOHN': 'j_agradece', 'CRÁQUEN': 'q_espera', 'MAGNUS': 'm_fareja', 'SPHYRUS': 's_ruge', 'FRIGANTUS': 'fr_peito_a', 'INAZUMANEKO': 'i_curva', 'NOCTURNUS': 'n_ri', 'SILVANUS': 's_ergue'}
 for _f in PERSONAGENS:
     _f.setdefault("espera", ESPERA.get(_f["nome"], "vitoria"))
 for _f in SECRETOS:

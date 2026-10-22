@@ -49,6 +49,27 @@ POSES_XENO = {
                     ct=(30, 40), mt=(44, 14), cf=(38, 40), mf=(58, 10)),
     "x_vitoria": dict(pt=(-22, 0), jt=(-10, 30), pf=(20, 0), jf=(28, 30), qd=(-2, 56), pc=(6, 94), cb=(14, 114),
                       ct=(-14, 104), mt=(-32, 118), cf=(24, 104), mf=(42, 118)),
+    # (as poses do meio: deixam os golpes FLUIDOS — pedido do Gomes)
+    "x_cospe_prep": dict(pt=(-26, 0), jt=(-12, 30), pf=(20, 0), jf=(30, 30), qd=(-4, 54), pc=(10, 86), cb=(20, 102),
+                         ct=(0, 72), mt=(-10, 62), cf=(12, 74), mf=(4, 64)),
+    "x_cospe_fim": dict(pt=(-28, 0), jt=(-14, 28), pf=(24, 0), jf=(32, 28), qd=(-6, 50), pc=(22, 78), cb=(48, 84),
+                        ct=(6, 64), mt=(-4, 54), cf=(16, 66), mf=(6, 56)),
+    "x_rabada_gira": dict(pt=(-22, 0), jt=(-8, 26), pf=(20, 0), jf=(30, 26), qd=(-2, 48), pc=(8, 76), cb=(20, 84),
+                          ct=(-4, 62), mt=(-16, 52), cf=(10, 64), mf=(0, 52)),
+    "x_rabada_fim": dict(pt=(-26, 0), jt=(-6, 18), pf=(24, 0), jf=(34, 18), qd=(-2, 34), pc=(22, 56), cb=(38, 58),
+                         ct=(16, 40), mt=(32, 24), cf=(32, 42), mf=(52, 28)),
+    "x_rasteja2": dict(pt=(-30, 0), jt=(-18, 20), pf=(36, 4), jf=(24, 16), qd=(0, 26), pc=(26, 34), cb=(46, 38),
+                       ct=(40, 22), mt=(60, 6), cf=(28, 20), mf=(46, 4)),
+    "x_abaixa": dict(pt=(-28, 0), jt=(-12, 18), pf=(22, 0), jf=(30, 16), qd=(0, 34), pc=(22, 48), cb=(40, 52),
+                     ct=(26, 30), mt=(36, 6), cf=(32, 30), mf=(46, 6)),
+    "x_galope_a": dict(pt=(-40, 6), jt=(-24, 18), pf=(36, 4), jf=(26, 20), qd=(0, 30), pc=(28, 36), cb=(48, 40),
+                       ct=(44, 24), mt=(64, 10), cf=(46, 26), mf=(66, 14)),
+    "x_galope_b": dict(pt=(-8, 10), jt=(-4, 24), pf=(10, 8), jf=(14, 24), qd=(0, 34), pc=(24, 42), cb=(44, 46),
+                       ct=(20, 26), mt=(18, 8), cf=(24, 26), mf=(26, 8)),
+    "x_bote": dict(pt=(-34, 0), jt=(-18, 20), pf=(30, 0), jf=(28, 22), qd=(0, 38), pc=(28, 56), cb=(48, 58),
+                   ct=(42, 64), mt=(66, 70), cf=(44, 58), mf=(70, 56)),
+    "x_levanta": dict(pt=(-28, 0), jt=(-12, 22), pf=(24, 0), jf=(30, 22), qd=(-2, 40), pc=(20, 62), cb=(38, 70),
+                      ct=(18, 48), mt=(34, 34), cf=(28, 48), mf=(46, 36)),
 }
 proporcionar(POSES_XENO)
 
@@ -239,6 +260,17 @@ def garras(l, outro, jogo):
         return "fim"
 
 
+def rasteja_quadros():
+    """SHIFT (ideia do Gomes): se ABAIXA, dá uma GALOPADA de quatro e ATACA no fim (o bote com as garras)."""
+    q = [(0, "parado"), (R_INI - 1, "x_abaixa")]
+    t, k = R_INI + 2, 0
+    while t < R_FIM - 6:
+        q.append((t, "x_galope_a" if k % 2 == 0 else "x_galope_b"))
+        t, k = t + 4, k + 1
+    q += [(R_FIM - 3, "x_bote"), (R_FIM + 2, "x_bote"), (R_FIM + 7, "x_levanta"), (R_FIM + 12, "parado")]
+    return q
+
+
 def garras_quadros():
     q = [(0, "parado"), (G_INI - 2, "x_garra_b")]
     for k in range(G_HITS):
@@ -389,20 +421,22 @@ def _registra(nome, **g):
 
 
 _registra("xeno_cospe", ini=10, ativo=1, rec=18, dano=9, hit=14, defe=8, emp=2, nivel="medio", ia="longe",
-          ao_usar=cospe, quadros=[(0, "parado"), (6, "x_cospe"), (20, "x_cospe"), (29, "parado")])
+          ao_usar=cospe, quadros=[(0, "parado"), (5, "x_cospe_prep"), (9, "x_cospe_prep"), (11, "x_cospe"),
+                                  (16, "x_cospe_fim"), (22, "x_cospe_fim"), (29, "parado")])
 _registra("xeno_acido", ini=0, ativo=1, rec=0, proj=True, varios=True, raio=9, vel=9, dano=9, hit=14, defe=8, emp=2,
           nivel="medio", ao_acertar=acido_acertou)
 _registra("xeno_poca", ini=0, ativo=1, rec=0, dano=1, hit=0, defe=0, emp=0, nivel="medio", ia="longe")
 _registra("xeno_rabada", ini=12, ativo=8, rec=20, janelas=((12, 20),), caixa=(10, 0, 100, 120), dano=15, hit=20,
           defe=12, emp=2, nivel="medio", lanca=16, ia="perto", som="vento",
-          quadros=[(0, "parado"), (8, "x_rabada"), (26, "x_rabada"), (40, "parado")])
+          quadros=[(0, "parado"), (7, "x_rabada_gira"), (12, "x_rabada"), (18, "x_rabada_fim"),
+                   (26, "x_rabada_fim"), (40, "parado")])
 _registra("xeno_garras", ini=G_INI, ativo=G_HITS * G_INTERVALO, rec=12,
           janelas=tuple((G_INI + k * G_INTERVALO, G_INI + k * G_INTERVALO + 3) for k in range(G_HITS)),
           caixa=(10, 30, 88, 112), dano=4, hit=10, defe=7, emp=1, nivel="medio", logica=garras, ia="perto",
           quadros=garras_quadros())
 _registra("xeno_rasteja", base="agachado", ini=R_INI, ativo=R_FIM - R_INI, rec=12, janelas=((R_INI, R_FIM),),
           caixa=(0, 0, 64, 46), dano=8, hit=14, defe=8, emp=4, nivel="baixo", logica=rasteja, ia="medio", som="vento",
-          quadros=[(0, "parado"), (R_INI - 1, "x_rasteja"), (R_FIM, "x_rasteja"), (R_FIM + 12, "parado")])
+          quadros=rasteja_quadros())
 _registra("xeno_ultimate", ini=U_PULA, ativo=40, rec=0, janelas=((U_PULA, U_PULA + 40),), dano=0, hit=40, defe=20,
           emp=0, nivel="medio", ultimate=True,
           logica=ultimate, efeito=cura_efeito, ia="ultimate", quadros=ultimate_quadros())

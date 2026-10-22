@@ -1770,6 +1770,46 @@ _v("FRIGANTUS", "soneca", "SONECA DE INVERNO", frig_soneca, frig_soneca_ef)
 
 
 # =====================================================================
+# NOCTURNUS: PENDURADO NA LUA (sobe batendo as asas e fica pairando lá no alto, rindo, com a lua cheia atrás)
+# =====================================================================
+LUA_SOBE, LUA_PARA = 16, 60
+
+
+def noct_lua_y(l, t):
+    if t < LUA_SOBE:
+        return CHAO
+    k = suave(min(1, (t - LUA_SOBE) / (LUA_PARA - LUA_SOBE)))
+    return CHAO - 250 * k + (math.sin((t - LUA_PARA) * 0.12) * 8 if t >= LUA_PARA else 0)
+
+
+def noct_lua(l, t, jogo):
+    l.y = noct_lua_y(l, t)
+    l.vy = 0
+    l.sobrepor = p_(l, "n_ri" if t >= LUA_PARA + 10 and (t // 30) % 2 else "n_voa" if t >= LUA_SOBE else "parado")
+    if t == LUA_SOBE:
+        som.tocar("vento", 0.6)
+    if t == LUA_PARA + 10:
+        som.tocar("blip", 0.4)
+
+
+def noct_lua_atras(l, tela, t):
+    if t < LUA_SOBE:
+        return
+    k = min(1, (t - LUA_SOBE) / 30)
+    x, y = int(l.x), int(CHAO - 250 - 60 * l.s)
+    r = int(70 * k)
+    if r < 3:
+        return
+    brilho(tela, (x, y), int(r * 1.6), (230, 230, 200), 90)
+    pygame.draw.circle(tela, (246, 242, 214), (x, y), r)
+    for dx, dy, cr in ((-0.3, -0.2, 0.18), (0.25, 0.15, 0.12), (-0.05, 0.4, 0.1)):  # as crateras
+        pygame.draw.circle(tela, (220, 214, 184), (int(x + dx * r), int(y + dy * r)), max(1, int(cr * r)))
+
+
+_v("NOCTURNUS", "lua", "PENDURADO NA LUA", noct_lua, None, PRECO_CAPRICHADA, noct_lua_atras)
+
+
+# =====================================================================
 # CUTSCENES (as caprichadas viram cena de anime): (lutador, id) -> (clímax, fim, foco do clímax, fundo)
 # =====================================================================
 CENAS = {
@@ -1788,6 +1828,7 @@ CENAS = {
     ("MAGNUS", "vidro"): (AREIA_VIDRO, 120, "corpo", "luz"),
     ("SPHYRUS", "circulo"): (CIRC_SAI, 140, "corpo", "noite"),
     ("FRIGANTUS", "guerra"): (NEVE_SPLAT, 110, "alvo", "ceu"),
+    ("NOCTURNUS", "lua"): (LUA_PARA, 120, "corpo", "noite"),
 }
 
 
@@ -1799,7 +1840,7 @@ ANIME = {("MAX-10", "voa"): "cena_max:vitoria", ("FRIGANTUS", "guerra"): "cena_f
          ("FINN", "trono"): "cena_finn:vitoria", ("TROMOS", "casulo"): "cena_tromos:vitoria",
          ("TAI", "trofeu"): "cena_tai:vitoria", ("TAMER", "fogueira"): "cena_tamer:vitoria",
          ("JOHN", "serrado"): "cena_john:vitoria",
-         ("CRÁQUEN", "tesouro"): "cena_craquen:vitoria"}  # as que já viraram CENA DE ANIME desenhada
+         ("CRÁQUEN", "tesouro"): "cena_craquen:vitoria", ("NOCTURNUS", "lua"): "cena_nocturnus:vitoria"}  # as que já viraram CENA DE ANIME desenhada
 
 
 def _ligar_cenas():

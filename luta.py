@@ -537,7 +537,9 @@ class Jogo:
     # ------------------------------------------------------------ laço
     def rodar(self):
         som.musica("menu")
+        som.preparar_musicas()  # (as músicas do Gomes vão sendo fabricadas enquanto está no menu)
         while True:
+            som.atualizar()  # (ficou pronta: troca na hora)
             for ev in pygame.event.get():
                 if ev.type in (getattr(pygame, "CONTROLLERDEVICEADDED", -1), getattr(pygame, "CONTROLLERDEVICEREMOVED", -1)):
                     controle_video.atualizar()
@@ -695,6 +697,8 @@ class Jogo:
                 elif self.tela_atual == "luta" and self.partida.treino and ev.key == pygame.K_h:  # liga/desliga as caixas
                     self.partida.ver_caixas = not getattr(self.partida, "ver_caixas", False)
                     som.tocar("blip")
+                elif self.tela_atual == "luta" and ev.key == pygame.K_m:  # o RADINHO: passa pra próxima música
+                    som.proxima_musica()
                 elif self.tela_atual == "luta" and ev.key == pygame.K_p:  # TESTE: enche a barra da ultimate
                     self.partida.L[0].barra = BARRA_TOTAL if self.partida.L[0].tem_ult2() else BARRA_MAX
                 elif self.tela_atual == "luta" and self.partida.treino and pygame.K_1 <= ev.key <= pygame.K_5:

@@ -30,6 +30,7 @@ PERIODOS = {
     "CAMPO DE BATALHA": (POR, NOITE),
     "PÂNTANO": (NOITE, AMANHECER, NUBLADO),
     "NAVIO FANTASMA": (NOITE, AMANHECER),
+    "MONTE KARASUMA": (POR, NOITE, AMANHECER),
 }
 HORIZONTE = 0.6  # até onde (fração da altura) vai o "céu", pra o degradê e as estrelas
 

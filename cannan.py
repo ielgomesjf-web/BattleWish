@@ -54,6 +54,17 @@ POSES_CANNAN = {
                   ct=(-14, 80), mt=(-22, 96), cf=(10, 70), mf=(14, 44)),
     "c_continencia": dict(pt=(-18, 0), jt=(-14, 28), pf=(18, 0), jf=(16, 28), qd=(0, 56), pc=(2, 92), cb=(4, 110),
                           ct=(14, 98), mt=(10, 110), cf=(12, 76), mf=(10, 52)),
+    # (as poses do meio: deixam os golpes FLUIDOS — pedido do Gomes)
+    "c_saca": dict(pt=(-26, 0), jt=(-16, 26), pf=(24, 0), jf=(26, 28), qd=(0, 50), pc=(6, 86), cb=(10, 104),
+                   ct=(-2, 70), mt=(4, 58), cf=(16, 74), mf=(24, 66)),
+    "c_pistola_coice": dict(pt=(-26, 0), jt=(-16, 26), pf=(24, 0), jf=(26, 28), qd=(0, 50), pc=(6, 87), cb=(9, 105),
+                            ct=(18, 92), mt=(42, 100), cf=(6, 72), mf=(14, 54)),
+    "c_coronhada_prep": dict(pt=(-26, 0), jt=(-16, 26), pf=(24, 0), jf=(26, 28), qd=(0, 50), pc=(0, 86), cb=(2, 104),
+                             ct=(-10, 90), mt=(-24, 98), cf=(0, 72), mf=(4, 56)),
+    "c_upper_prep": dict(pt=(-20, 0), jt=(-10, 22), pf=(18, 0), jf=(22, 22), qd=(0, 42), pc=(10, 76), cb=(16, 92),
+                         ct=(-8, 62), mt=(-2, 50), cf=(16, 60), mf=(22, 50)),
+    "c_canhao_coice": dict(pt=(-34, 0), jt=(-24, 26), pf=(24, 0), jf=(28, 28), qd=(-6, 48), pc=(2, 82), cb=(6, 100),
+                           ct=(12, 76), mt=(24, 80), cf=(26, 84), mf=(50, 88)),
 }
 proporcionar(POSES_CANNAN)
 
@@ -97,6 +108,24 @@ def atira(l, jogo, golpe, de_onde="pistola", espalha=0.0):
 # =====================================================================
 # E: PISTOLA (3 tiros)
 # =====================================================================
+def pistola_quadros():
+    """Saca da cintura e o braço dá um COICE a cada tiro (10, 17, 24). Pedido do Gomes: mais fluido."""
+    q = [(0, "parado"), (5, "c_saca"), (9, "c_pistola")]
+    for tiro in (10, 17, 24):
+        q += [(tiro, "c_pistola"), (tiro + 2, "c_pistola_coice"), (tiro + 5, "c_pistola")]
+    return q + [(32, "c_pistola"), (38, "parado")]
+
+
+def canhao_quadros():
+    """O canhão dando TRANCO pra trás a cada tiro."""
+    q = [(0, "parado"), (R_INI - 2, "c_canhao")]
+    for k in range(R_TIROS):
+        t = R_INI + k * R_INTERVALO
+        q += [(t, "c_canhao"), (t + 2, "c_canhao_coice"), (t + R_INTERVALO - 1, "c_canhao")]
+    fim = R_INI + R_TIROS * R_INTERVALO
+    return q + [(fim, "c_canhao"), (fim + 14, "parado")]
+
+
 def pistola(l, outro, jogo):
     l.vx = 0
     l.fisica(jogo)
@@ -251,18 +280,17 @@ def _registra(nome, **g):
 _registra("cannan_bala", ini=0, ativo=1, rec=0, dano=5, hit=10, defe=8, emp=2, nivel="medio", proj=True, raio=5, vel=16,
           desenho_proj=desenha_bala)
 _registra("cannan_pistola", ini=10, ativo=16, rec=12, dano=5, hit=10, defe=8, emp=2, nivel="medio", logica=pistola,
-          ia="longe", quadros=[(0, "parado"), (8, "c_pistola"), (30, "c_pistola"), (38, "parado")])
+          ia="longe", quadros=pistola_quadros())
 _registra("cannan_coronhada", ini=6, ativo=4, rec=0, janelas=((6, 10), (14, 20)), dano=5, hit=18, defe=10, emp=1,
           nivel="medio", logica=coronhada, ia="perto", som="vento",
-          quadros=[(0, "parado"), (5, "c_coronhada"), (11, "c_coronhada"), (14, "c_upper"), (24, "c_upper"),
-                   (40, "parado")])
+          quadros=[(0, "parado"), (3, "c_coronhada_prep"), (6, "c_coronhada"), (10, "c_coronhada"),
+                   (12, "c_upper_prep"), (15, "c_upper"), (24, "c_upper"), (40, "parado")])
 GOLPES["cannan_coronhada"]["total"] = 40
 GOLPES["cannan_upper"] = dict(GOLPES["cannan_coronhada"], dano=15, lanca=16, emp=2)
 _registra("cannan_canhao", ini=R_INI, ativo=R_TIROS * R_INTERVALO, rec=14,
           janelas=tuple((R_INI + k * R_INTERVALO, R_INI + k * R_INTERVALO + 3) for k in range(R_TIROS)),
           caixa=(18, 34, 116, 126), dano=2, hit=10, defe=7, emp=1, nivel="medio", logica=canhao_perto, ia="medio",
-          quadros=[(0, "parado"), (R_INI - 2, "c_canhao"), (R_INI + R_TIROS * R_INTERVALO, "c_canhao"),
-                   (R_INI + R_TIROS * R_INTERVALO + 14, "parado")])
+          quadros=canhao_quadros())
 GOLPES["cannan_explosao"] = GOLPES["cannan_canhao"]
 GOLPES["cannan_explosao_final"] = dict(GOLPES["cannan_canhao"], dano=6, emp=7, hit=16)
 _registra("cannan_corre", ini=6, ativo=40, rec=16, janelas=((6, 46),), caixa=(0, 20, 56, 120), dano=10, hit=18, defe=12,

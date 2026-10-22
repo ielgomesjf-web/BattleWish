@@ -44,8 +44,20 @@ HABILIDADES = {
     "natacao": dict(nome="NATAÇÃO", desc="X: nada só com a barbatana, intangível (8 s); passar por baixo dá 8 e derruba"),
     "frenesi": dict(nome="FRENESI", desc="adversário com 35% de vida ou menos: dano x2 e +30% de velocidade"),
     "abracadabra": dict(nome="ABRACADABRA", desc="depois de teleportar (Q e SHIFT), fica invisível por meio segundo"),
+    "furia_samurai": dict(nome="FÚRIA SAMURAI", desc="levou PARRY: ultimate +8%; o CONTRA-ATAQUE (Q) acertou: +5%"),
+    "eco": dict(nome="ECOLOCALIZAÇÃO", desc="o adversário se mexe MUITO: +50% velocidade e força; mexe POUCO: -25%"),
+    "planar": dict(nome="PLANAR", desc="no ar cai devagar (plana com as asas) e leva 25% menos de dano lá em cima"),
+    "senso": dict(nome="SENSO AUDITIVO", desc="X troca: AGUDO (leves/aéreos/multi) ou GRAVE (pesados/agachados/dash): "
+                                              "leva 15% menos; a cada acerto: AGUDO +3% rapidez / GRAVE +5% dano (5x)"),
+    "jardim": dict(nome="JARDIM VIVO", desc="cada armadilha no mapa: +7% de força (até 5 = +35%)"),
+    "enganador": dict(nome="ENGANADOR SELVAGEM", desc="X + ataque: FINGE o golpe (0,5 s) e pode trocar por outro; 1x a cada 3 s"),
+    "vantagem": dict(nome="VANTAGEM POR CIMA", desc="adversário AGACHADO: os ataques dele ficam 15% mais fortes"),
+    "poder_samurai": dict(nome="PODER SAMURAI", desc="parado 3 s: por 3 s os golpes dão VENENO, FOGO, RAIO ou GELO (sorteado)"),
 }
 
+JARDIM_PASSO = 0.07   # JARDIM VIVO (Silvanus): +7% de força por armadilha no mapa (máximo 5)
+VANTAGEM_DANO = 1.15  # VANTAGEM POR CIMA (Silvanus)
+FINTA_TEMPO, FINTA_ESPERA = 30, 180  # ENGANADOR SELVAGEM: a finta dura 0,5 s; 1 vez a cada 3 s
 MAQUINARIO_VIDA = 0.25
 MAQUINARIO_DANO = 1.25
 MAQUINARIO_DEFESA = 0.75
@@ -124,6 +136,12 @@ def mult_causa(l, g):
         m *= EMBOSCADA_DANO  # EMBOSCADA (Tromos): o golpe que saiu da camuflagem
     if "eletro" in hs:
         m *= padrao_caca(l, g)  # PADRÃO DE CAÇA (Sphyrus)
+    if "eco" in hs:
+        m *= ECO_MULT.get(l.extra.get("eco_nivel", "normal"), 1.0)  # ECOLOCALIZAÇÃO (Nocturnus)
+    if "senso" in hs and l.extra.get("senso", "agudo") == "grave":
+        m *= 1 + SENSO_PASSO * l.extra.get("senso_pilha", 0)  # SENSO GRAVE: +5% de dano por pilha
+    if "jardim" in hs:  # JARDIM VIVO (Silvanus): +7% por armadilha no mapa
+        m *= 1 + JARDIM_PASSO * len(l.extra.get("armadilhas") or ())
     return m
 
 
@@ -188,6 +206,8 @@ def mult_vel(l):
         m *= AGUA_VEL
     if l.extra.get("pocao_veloz", 0) > 0:  # ALQUIMIA (Finn): poção de velocidade
         m *= POCAO_VEL
+    if "eco" in hs:
+        m *= ECO_MULT.get(l.extra.get("eco_nivel", "normal"), 1.0)  # ECOLOCALIZAÇÃO (Nocturnus)
     if l.extra.get("neve_t", 0) > 0:  # NEVASCA (Frigantus): o gelo grudando deixa mais lento
         m *= 1 - NEVE_LENTO * l.extra.get("neve", 0)
     return m
@@ -214,6 +234,8 @@ def mult_ataque(l):
         return LOBO_ATAQUE
     if "furia_sumo" in ativas(l):
         return TAI_ATAQUE  # (o Tai é LENTO nos ataques: pedido do Gomes)
+    if "senso" in ativas(l) and l.extra.get("senso", "agudo") == "agudo" and l.extra.get("senso_pilha", 0) > 0:
+        return 1 + SENSO_VEL_PASSO * l.extra["senso_pilha"]  # SENSO AGUDO: ataques mais rápidos
     return 1.0
 
 
@@ -233,6 +255,8 @@ def mult_recebe(l, atacante=None, g=None):
     """Multiplica o dano que ESSE lutador leva."""
     m = 1.0
     hs = ativas(l)
+    if atacante is not None and atacante is not l and "vantagem" in ativas(atacante) and             (l.estado == "agachado" or (l.estado == "defendendo" and getattr(l, "agachado_def", False))):
+        m *= VANTAGEM_DANO  # VANTAGEM POR CIMA (Silvanus): bateu em quem está AGACHADO
     if "colete" in hs and atacante is not l and de_longe(l, atacante, g):
         m *= COLETE_DEFESA
     if "maquinario" in hs and ligada(l, "maquinario"):
@@ -243,6 +267,15 @@ def mult_recebe(l, atacante=None, g=None):
         m *= SAPO_AR
     if "adaptacao" in hs and atacante is not None and atacante is not l and g is not None:
         m *= adaptar(l, atacante)
+    if "planar" in hs and not l.no_chao():
+        m *= PLANAR_DEFESA  # PLANAR (Nocturnus): lá em cima leva menos
+    if "senso" in hs and atacante is not None and atacante is not l and g is not None and senso_pega(l, g):
+        m *= SENSO_DEFESA  # SENSO AUDITIVO: o tipo de golpe que ele está "ouvindo" tira menos... e dá pilha
+        x = l.extra
+        x["senso_pilha"] = min(SENSO_MAX, x.get("senso_pilha", 0) + 1)
+        x["senso_espera"] = SENSO_SOME
+    if atacante is not None and atacante is not l and atacante.extra.get("poder_t", 0) > 0:
+        aplicar_status(l, atacante.extra.get("poder_tipo", "veneno"))  # PODER SAMURAI de quem bateu
     if "furia_sumo" in hs and atacante is not None and atacante is not l and getattr(atacante, "combo", 0) >= FURIA_HITS:
         agora = getattr(l, "quadros", 0)
         if agora >= l.extra.get("furia_pronta", 0):  # levou o 5º golpe do combo: FÚRIA! (de vez em quando)
@@ -396,8 +429,26 @@ def sapo_quadro(l, jogo):
     x["cima_antes"] = cima
 
 
+def contra_samurai(l, g, atacante):
+    """CONTRA-ATAQUE do INAZUMANEKO (Q): na janela da postura, o golpe (de perto: tiro não!) é desviado e ele revida.
+    Devolve True se pegou (aí o golpe não acerta)."""
+    if l.estado != "ataque" or l.nome_golpe != "inaz_contra" or "pegou" in l.memo:
+        return False
+    import inazumaneko
+    if not (inazumaneko.C_INI <= l.t < inazumaneko.C_INI + inazumaneko.C_JANELA):
+        return False
+    if not g or g.get("proj") or g.get("ultimate") or g.get("ultimate2") or atacante is None or atacante is l:
+        return False  # (não segura tiro nem ultimate: é o ponto fraco dele)
+    l.memo["pegou"] = l.t
+    l.inv = max(l.inv, 24)
+    return True
+
+
 def substituicao(l, g, atacante):
-    """Chamado quando um golpe ia pegar nele: devolve True se ele SUBSTITUIU (o golpe pega no tronco)."""
+    """Chamado quando um golpe ia pegar nele: devolve True se ele SUBSTITUIU (o golpe pega no tronco)
+    — ou se o INAZUMANEKO pegou no CONTRA-ATAQUE."""
+    if contra_samurai(l, g, atacante):
+        return True
     if "ninja" not in ativas(l) or l.extra.get("subst_espera", 0) > 0 or l.vida <= 0:
         return False
     if not g or g.get("ultimate") or g.get("ultimate2") or atacante is None or atacante is l:
@@ -591,3 +642,200 @@ def john_quadro(l, jogo):
                      coelho_dir=l.dir)
             jogo.faisca(outro.x, outro.y - 40 * outro.s, False, False)
             som.tocar("soco", 0.6)
+
+
+# =====================================================================
+# INAZUMANEKO (v3.0, ideia do Gomes) — 2 passivas pra escolher com H na seleção:
+#   FÚRIA SAMURAI  o adversário deu PARRY nele: ultimate +8%; o CONTRA-ATAQUE dele (Q) acertou: +5%
+#   PODER SAMURAI  ficou 3 s parado: por 3 s os golpes dão um STATUS sorteado (a katana brilha na cor):
+#                  VENENO (1/s por 4 s), FOGO (2/s por 2 s), RAIO (trava 0,3 s) ou GELO (mais lento 2 s)
+# =====================================================================
+FURIA_PARRY = 0.08
+FURIA_CONTRA = 0.05
+PODER_PARADO = 3 * 60
+PODER_TEMPO = 3 * 60
+STATUS = ("veneno", "fogo", "raio", "gelo")
+COR_STATUS = {"veneno": (110, 220, 80), "fogo": (255, 140, 40), "raio": (255, 230, 80), "gelo": (140, 210, 255)}
+VENENO_TEMPO, VENENO_CADA = 4 * 60, 60     # 1 de dano por segundo, 4 s
+FOGO_TEMPO, FOGO_CADA = 2 * 60, 30         # 2 por segundo, 2 s
+RAIO_TRAVA = 18                            # 0,3 s travado
+GELO_TEMPO, GELO_NIVEL = 2 * 60, 2         # 2 s mais lento (usa o "gelo grudado" da Nevasca)
+
+
+def furia_samurai(l, quanto):
+    """FÚRIA SAMURAI: enche a ultimate (quanto = fração da barra azul)."""
+    if "furia_samurai" in ativas(l):
+        from config import BARRA_MAX
+        l.encher(BARRA_MAX * quanto)
+        l.extra["furia_flash"] = 30
+
+
+def aplicar_status(alvo, tipo):
+    """PODER SAMURAI: o golpe deixou um status no alvo."""
+    x = alvo.extra
+    if tipo == "veneno":
+        x["veneno_t"] = VENENO_TEMPO
+    elif tipo == "fogo":
+        x["fogo_t"] = FOGO_TEMPO
+    elif tipo == "raio":
+        x["raio_t"] = RAIO_TRAVA
+    elif tipo == "gelo":
+        x["neve"] = max(x.get("neve", 0), GELO_NIVEL) if x.get("neve_t", 0) > 0 else GELO_NIVEL
+        x["neve_t"] = max(x.get("neve_t", 0), GELO_TEMPO)
+
+
+def samurai_quadro(l, jogo):
+    """Todo quadro (o inazumaneko.todo_quadro chama): a Fúria percebendo o parry, o Poder carregando
+    e os status correndo em quem levou."""
+    import random
+    hs = ativas(l)
+    x = l.extra
+    outro = jogo.L[1] if jogo.L[0] is l else jogo.L[0]
+    if x.get("furia_flash", 0) > 0:
+        x["furia_flash"] -= 1
+    # FÚRIA SAMURAI: o adversário acabou de dar parry (o brilho do parry acendeu)
+    brilho = getattr(outro, "parry_brilho", 0)
+    if brilho > x.get("parry_antes", 0):
+        furia_samurai(l, FURIA_PARRY)
+    x["parry_antes"] = brilho
+    # PODER SAMURAI: parado 3 s -> acende por 3 s
+    if x.get("poder_t", 0) > 0:
+        x["poder_t"] -= 1
+        x["parado_t"] = 0
+    elif "poder_samurai" in hs and l.vida > 0:
+        parado = l.estado in ("parado", "defendendo") and abs(l.vx) < 0.1 and l.no_chao()
+        x["parado_t"] = x.get("parado_t", 0) + 1 if parado else 0
+        if x["parado_t"] >= PODER_PARADO:
+            x["parado_t"] = 0
+            x["poder_t"] = PODER_TEMPO
+            x["poder_tipo"] = random.choice(STATUS)  # (random da luta: igual nos dois PCs no online)
+            import som
+            som.tocar("confirma", 0.5)
+    # os STATUS no adversário (quem bateu é quem cuida do relógio)
+    o = outro.extra
+    if o.get("veneno_t", 0) > 0:
+        o["veneno_t"] -= 1
+        if o["veneno_t"] % VENENO_CADA == 0 and outro.vida > 1:
+            outro.vida = max(1, outro.vida - 1)  # (veneno não nocauteia sozinho)
+    if o.get("fogo_t", 0) > 0:
+        o["fogo_t"] -= 1
+        if o["fogo_t"] % FOGO_CADA == 0 and outro.vida > 1:
+            outro.vida = max(1, outro.vida - 1)
+    if o.get("raio_t", 0) > 0:
+        if outro.estado in ("parado", "andando", "agachado", "defendendo") and outro.vida > 0:
+            outro.mudar("tonto")
+            outro.golpe = None
+            outro.tonto_tempo = o["raio_t"]
+            outro.paralisado = True
+        o["raio_t"] = 0
+
+
+# =====================================================================
+# NOCTURNUS (v3.0, ideias do Gomes) — 3 passivas pra escolher com H:
+#   ECOLOCALIZAÇÃO  o adversário se mexe MUITO: +50% velocidade e força; normal: nada; mexe POUCO: -25%
+#   PLANAR          no ar cai devagar (plana) e leva 25% menos lá em cima
+#   SENSO AUDITIVO  X troca: AGUDO (golpes leves, aéreos ou de vários hits) / GRAVE (pesados, agachados ou dash):
+#                   esse tipo tira 15% menos dele e cada um que acerta dá 1 pilha (até 5; some 5 s sem apanhar):
+#                   AGUDO = +3% de RAPIDEZ por pilha, GRAVE = +5% de DANO por pilha (equilíbrio 21/10, escolha do Gomes)
+#   + os efeitos que ele causa (controles trocados, cego, enjoo, sono) — o relógio deles roda aqui
+# =====================================================================
+ECO_MULT = {"muito": 1.5, "pouco": 0.75}
+ECO_MUITO, ECO_POUCO = 2.5, 0.6    # (média de quanto o adversário anda por quadro)
+PLANAR_QUEDA, PLANAR_DEFESA = 3.0, 0.75
+SENSO_DEFESA, SENSO_PASSO, SENSO_MAX, SENSO_SOME = 0.85, 0.05, 5, 5 * 60  # (equilíbrio 21/10: o Gomes escolheu)
+CEGO_CPU_BATE = 8  # (o computador cego: a cada 8 quadros os morcegos dele saem 1 leva; uns 2,5 s no total)
+SENSO_VEL_PASSO = 0.03  # (AGUDO: velocidade de ataque por pilha; o GRAVE usa o SENSO_PASSO no dano)
+
+
+def senso_pega(l, g):
+    """O golpe é do tipo que o SENSO AUDITIVO está ouvindo agora?"""
+    if l.extra.get("senso", "agudo") == "agudo":
+        return (not g.get("especial") and g.get("dano", 0) <= 6) or bool(g.get("aereo"))             or len(g.get("janelas", ())) > 1 or bool(g.get("varios"))
+    return (g.get("dano", 0) >= 10 and not g.get("proj")) or g.get("base") == "agachado" or g.get("ia") == "medio"
+
+
+def finta(l, e):
+    """ENGANADOR SELVAGEM (Silvanus, ideia do Gomes): depois do X, o próximo ataque é FALSO — só a animação começa
+    (0,5 s, sem dano) — e apertar OUTRO ataque no meio troca pelo golpe de verdade."""
+    x = l.extra
+    botao = "soco" if e.soco else "chute" if e.chute else e.especial
+    aperta = botao is not None and botao != x.get("finta_prev")
+    x["finta_prev"] = botao
+    if l.estado == "ataque" and l.nome_golpe == "silv_finta":
+        if aperta and botao != x.get("finta_botao"):  # TROCOU: sai da finta e o golpe de verdade começa agora
+            l.golpe = l.nome_golpe = None
+            l.sobrepor = {}
+            l.mudar("parado")
+            return e
+        return e
+    if x.get("finta_armada", 0) > 0 and aperta and l.estado in ("parado", "andando", "agachado") and l.no_chao():
+        from golpes import GOLPES
+        nome = botao if botao in ("soco", "chute") else l.golpe_do_botao(botao)
+        if nome and not GOLPES.get(nome, {}).get("ultimate"):
+            x["finta_armada"] = 0
+            x["finta_espera"] = FINTA_ESPERA
+            x["finta_de"], x["finta_botao"] = nome, botao
+            l.comecar("silv_finta")
+            import copy
+            e = copy.copy(e)
+            e.soco = e.chute = False
+            e.especial = None
+    return e
+
+
+def trocar_controles(l, e):
+    """CONTROLES TROCADOS (a Bola de Eco do Nocturnus): soco<->chute, E->Q->R->E, SHIFT<->Z, cima<->baixo,
+    frente<->trás. O lutador.update chama isso antes de usar a entrada."""
+    if e is None:
+        return e
+    if "enganador" in ativas(l):
+        e = finta(l, e)
+    if l.extra.get("cego_cpu"):  # o COMPUTADOR CEGO (tela lotada de morcegos): fica PERDIDO — não anda, não defende,
+        import copy                # não ataca (os morcegos vão saindo sozinhos: nocturnus.morcegos_tela_quadro)
+        e = copy.copy(e)
+        e.dir, e.especial, e.barra, e.soco, e.chute = 5, None, False, False, False
+    if l.extra.get("trocado_t", 0) <= 0:
+        return e
+    import copy
+    n = copy.copy(e)
+    n.soco, n.chute = e.chute, e.soco
+    n.especial = {"E": "Q", "Q": "R", "R": "E", "SHIFT": "Z", "Z": "SHIFT"}.get(e.especial, e.especial)
+    troca_dir = {1: 9, 2: 8, 3: 7, 4: 6, 6: 4, 7: 3, 8: 2, 9: 1}
+    n.dir = troca_dir.get(e.dir, e.dir)
+    return n
+
+
+def nocturnus_quadro(l, jogo):
+    """Todo quadro (o nocturnus.todo_quadro chama): a Ecolocalização medindo o adversário, o Planar, o Senso
+    perdendo as pilhas e o relógio dos efeitos no adversário."""
+    hs = ativas(l)
+    x = l.extra
+    outro = jogo.L[1] if jogo.L[0] is l else jogo.L[0]
+    if x.get("senso_flash", 0) > 0:
+        x["senso_flash"] -= 1
+    # ECOLOCALIZAÇÃO: quanto o adversário anda (média)
+    x["eco_mexe"] = x.get("eco_mexe", 1.8) * 0.985 + (abs(outro.vx) + (2 if not outro.no_chao() else 0)) * 0.015
+    if "eco" in hs:
+        x["eco_nivel"] = "muito" if x["eco_mexe"] > ECO_MUITO else "pouco" if x["eco_mexe"] < ECO_POUCO else "normal"
+    # PLANAR: caindo devagar
+    if "planar" in hs and not l.no_chao() and l.estado == "pulando" and l.vy > PLANAR_QUEDA:
+        l.vy = PLANAR_QUEDA
+    # SENSO AUDITIVO: as pilhas somem se ficar 5 s sem apanhar
+    if x.get("senso_espera", 0) > 0:
+        x["senso_espera"] -= 1
+        if x["senso_espera"] == 0:
+            x["senso_pilha"] = 0
+    # os efeitos no adversário
+    o = outro.extra
+    for k in ("trocado_t", "cego_t", "enjoo_t", "dormindo_t"):
+        if o.get(k, 0) > 0:
+            o[k] -= 1
+    if o.get("tonto_extra", 0) > 0:  # (o efeito TONTO da ultimate: quando a paralisia acaba, ainda fica tonto)
+        o["tonto_extra"] -= 1
+        if outro.estado in ("parado", "andando") and outro.vida > 0 and o["tonto_extra"] > 30:
+            outro.mudar("tonto")
+            outro.tonto_tempo = 60
+            o["tonto_extra"] = 0
+    if o.get("dormindo_t", 0) > 0 and outro.estado != "tonto":
+        o["dormindo_t"] = 0  # (acordou)
+

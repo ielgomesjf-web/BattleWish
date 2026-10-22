@@ -1266,6 +1266,40 @@ _e("FRIGANTUS", "barril", "O BARRIL", frig_barril, frig_barril_ef)
 
 
 # =====================================================================
+# NOCTURNUS: ECO NO ESCURO (escondido, 3 anéis de sonar saem de onde ele está, e PUF: aparece de asas abertas)
+# =====================================================================
+ECO_ANEIS, ECO_SURGE = (0, 20, 40), 50
+
+
+def noct_eco(l, t, jogo):
+    if final(l, t):
+        l.t += 1
+        return
+    l.x, l.y = xf(l), CHAO
+    l.esconde = t < ECO_SURGE
+    l.sobrepor = pz(l, "n_chama" if t < ECO_SURGE + 34 else "parado")
+    if t in ECO_ANEIS:
+        som.tocar("laser", 0.3)
+    if t == ECO_SURGE:
+        som.tocar("vento", 0.7)
+        fumaca(jogo, l.x, CHAO - 70 * l.s, 12, (40, 30, 56), 4, -0.6)
+    l.t += 1
+
+
+def noct_eco_ef(l, tela, t):
+    cx, cy = xf(l), CHAO - 70 * l.s
+    for nasce in ECO_ANEIS:  # os anéis de SONAR azuis (crescendo e sumindo)
+        u = t - nasce
+        if 0 <= u < 36:
+            r = int(10 + u * 7)
+            cor = (110, 200, 255) if u < 24 else (60, 120, 170)
+            pygame.draw.circle(tela, cor, (int(cx), int(cy)), r, 3 if u < 24 else 2)
+
+
+_e("NOCTURNUS", "eco", "ECO NO ESCURO", noct_eco, noct_eco_ef)
+
+
+# =====================================================================
 # CUTSCENES: a entrada mais elaborada de cada lutador vira cena de anime (e custa mais)
 # (lutador, id) -> (clímax, fim, foco do clímax, fundo, foco do fim)
 # =====================================================================
@@ -1278,7 +1312,7 @@ ANIME = {("MAX-10", "capsula"): "cena_max:entrada", ("FRIGANTUS", "barril"): "ce
          ("FINN", "tornado"): "cena_finn:entrada", ("TROMOS", "ovo"): "cena_tromos:entrada",
          ("TAI", "ceu"): "cena_tai:entrada", ("TAMER", "galope"): "cena_tamer:entrada",
          ("JOHN", "caixa"): "cena_john:entrada",
-         ("CRÁQUEN", "tentaculo"): "cena_craquen:entrada"}  # as que já viraram CENA DE ANIME desenhada (arquivo da cena)
+         ("CRÁQUEN", "tentaculo"): "cena_craquen:entrada", ("NOCTURNUS", "eco"): "cena_nocturnus:entrada"}  # as que já viraram CENA DE ANIME desenhada (arquivo da cena)
 CENAS = {
     ("MAX-10", "capsula"): (CAP_ABRE, 100, "corpo", "ceu", "geral"),
     ("RIB", "shurikens"): (50, 100, "corpo", "noite", "corpo"),
@@ -1295,6 +1329,7 @@ CENAS = {
     ("MAGNUS", "jaula"): (40, 100, "corpo", "noite", "corpo"),
     ("SPHYRUS", "tanque"): (56, 105, "corpo", "noite", "corpo"),
     ("FRIGANTUS", "barril"): (50, 100, "corpo", "noite", "corpo"),
+    ("NOCTURNUS", "eco"): (ECO_SURGE, 100, "corpo", "noite", "corpo"),
 }
 
 

@@ -14,6 +14,7 @@ ROUNDS_PRA_VENCER = 2
 # PIXEL ART: tamanho de cada "pixel" do desenho, em pixels da tela.
 # 1 = sem pixel art, 2 = pixel art com bastante detalhe (tipo SF2), 4, 6, 10 = cada vez mais quadradão
 PIXEL = 3
+EFEITOS_DUROS = True  # (v3.0, pedido do Gomes: os EFEITOS também em pixel art de verdade, com borda dura)
 
 PARADA_GOLPE = 7
 DURACAO_ENTRADA = 110       # quadros da entrada dos personagens (começo da luta)            # quadros que a tela "congela" quando um golpe acerta (dá peso)
@@ -47,6 +48,8 @@ ROLA_TEMPO = 24             # quadros rolando
 ROLA_INV = 14               # quadros invencível no começo do rolamento
 ROLA_VEL = 8.5
 ROLA_ESPERA = 30            # depois de rolar, espera isso pra rolar de novo
+ESQ_JANELA = 8              # ESQUIVA PERFEITA (v3.0): rolou e o golpe ia pegar nesses primeiros quadros do rolamento...
+ESQ_LENTO = 60              # ...o OPONENTE fica em câmera lenta (metade da velocidade) por 1 s; quem esquivou não
 PARRY_JANELA = 8            # quadros que o parry fica ligado depois do toque
 PARRY_TRAVA = 22            # errou o tempo: espera isso pra poder tentar de novo
 PARRY_PARADA = 16           # quadros que tudo congela quando dá parry
@@ -90,7 +93,7 @@ PROVOCA_TEMPO = 70         # quadros parado provocando
 PROVOCA_BARRA = 120        # quanto enche da barra da ultimate (de 1000) se não apanhar
 
 # ---- online ----
-VERSAO = "2.0"      # os dois PCs precisam da mesma versão (o online confere)
+VERSAO = "3.0"      # os dois PCs precisam da mesma versão (o online confere)
 
 # ---- botão de BARRA (F no teclado, LT no controle) ----
 BARRA_TECLA = pygame.K_f

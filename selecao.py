@@ -37,10 +37,10 @@ def retrato(ficha, tam=CARTA):
         k = y / tam
         sup.fill((int(40 + 30 * k), int(36 + 20 * k), int(60 + 20 * k)), (0, y, tam, 1))
     l = Lutador(ficha, 0, 1)
-    l.s = ficha["tam"] * 2.3 * tam / CARTA
+    l.s = ficha["tam"] * 2.3 * tam / CARTA * ficha.get("retrato_zoom", 1.0)  # (cabeção grande: afasta)
     p = l.pose_atual()
     l.x = tam * 0.5 - p["cb"][0] * l.s  # a cabeça no meio do quadradinho
-    topo_cabeca = (p["cb"][1] + 12) * l.s
+    topo_cabeca = (p["cb"][1] + 12 + ficha.get("retrato_dy", 0)) * l.s
     l.y = topo_cabeca + tam * 0.12
     l.chao_sombra = 10_000
     l.desenhar(sup)

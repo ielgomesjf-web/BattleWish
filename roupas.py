@@ -182,6 +182,39 @@ ROUPAS = {
         dict(id="pegrande", nome="PÉ-GRANDE", preco=0, codigo="BIGFOOTPRINT", cor=(110, 80, 50), troca={
             "m": (118, 84, 52), "M": (84, 58, 34), "p": (62, 50, 42), "c": (80, 130, 50)}, estilo="pegrande"),
     ],
+    "INAZUMANEKO": [
+        dict(id="padrao", nome="ORIGINAL", preco=0),
+        dict(id="tigrenegro", nome="TIGRE NEGRO", preco=100, cor=(40, 38, 44), troca={  # o pelo preto, listras brancas
+            "w": (46, 44, 52), "W": (28, 26, 34), "l": (90, 88, 96), "s": (236, 236, 230), "o": (255, 80, 60),
+            "r": (60, 60, 70), "R": (96, 96, 110), "d": (180, 180, 196), "g": (110, 20, 30), "G": (150, 40, 50)}),
+        dict(id="ronindejade", nome="RONIN DE JADE", preco=200, cor=(60, 160, 120), troca={  # o tigre dourado de armadura verde
+            "w": (236, 180, 90), "W": (196, 140, 60), "l": (250, 236, 210), "s": (70, 40, 20), "o": (90, 230, 160),
+            "r": (40, 120, 90), "R": (70, 170, 130), "d": (236, 220, 150), "g": (30, 60, 50), "G": (50, 90, 74),
+            "h": (30, 40, 34), "H": (50, 64, 56)}),
+        dict(id="oni", nome="ONI", preco=0, codigo="PARADISEHELL", cor=(190, 30, 34), troca={  # a máscara de demônio
+            "r": (30, 28, 34), "R": (60, 56, 64), "d": (190, 30, 34), "g": (24, 22, 28), "G": (50, 46, 56),
+            "h": (20, 18, 24), "H": (44, 40, 50), "o": (255, 40, 40), "w": (120, 120, 128), "W": (90, 90, 98),
+            "l": (160, 160, 166), "b": (190, 30, 34)}, estilo="oni"),
+    ],
+    "SILVANUS": [
+        dict(id="padrao", nome="ORIGINAL", preco=0),
+        dict(id="outono", nome="OUTONO", preco=100, cor=(210, 110, 40), troca={  # as folhas de outono, a boca vermelha
+            "g": (200, 110, 40), "G": (240, 170, 70), "d": (140, 64, 26), "p": (170, 36, 30), "P": (220, 80, 56),
+            "m": (160, 90, 34), "f": (255, 210, 80), "F": (255, 246, 200), "y": (255, 200, 90), "Y": (150, 96, 50)}),
+        dict(id="luar", nome="LUAR DA FLORESTA", preco=200, cor=(150, 200, 230), troca={  # a planta que brilha de noite
+            "g": (70, 110, 140), "G": (130, 190, 220), "d": (40, 60, 90), "p": (40, 70, 130), "P": (90, 150, 220),
+            "q": (14, 24, 50), "m": (60, 100, 120), "f": (200, 240, 255), "F": (255, 255, 255),
+            "y": (140, 255, 250), "Y": (60, 110, 130), "t": (70, 70, 90), "T": (110, 110, 140)}),
+    ],
+    "NOCTURNUS": [
+        dict(id="padrao", nome="ORIGINAL", preco=0),
+        dict(id="albino", nome="ALBINO", preco=100, cor=(236, 226, 230), troca={  # o morcego branco de olho vermelho
+            "p": (226, 218, 222), "P": (250, 244, 246), "m": (240, 190, 200), "M": (210, 150, 166), "f": (250, 236, 240),
+            "F": (255, 250, 252), "e": (255, 60, 70), "r": (255, 120, 140), "b": (200, 120, 140), "B": (240, 190, 200)}),
+        dict(id="cristal", nome="ECO DE CRISTAL", preco=200, cor=(140, 90, 220), troca={  # o morcego dos cristais da caverna
+            "p": (60, 30, 100), "P": (110, 60, 170), "m": (170, 110, 255), "M": (120, 70, 200), "f": (150, 110, 220),
+            "F": (200, 170, 255), "e": (255, 220, 120), "b": (255, 200, 90), "B": (255, 240, 180), "v": (220, 130, 255)}),
+    ],
     "TAI": [
         dict(id="padrao", nome="ORIGINAL", preco=0),
         dict(id="dourado", nome="MAWASHI DOURADO", preco=100, cor=(236, 190, 150), troca={

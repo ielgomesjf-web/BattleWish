@@ -50,6 +50,9 @@ POSES_TAI = {
                     ct=(-20, 44), mt=(-30, 30), cf=(20, 48), mf=(36, 40)),
     "t_sal": dict(pt=(-28, 0), jt=(-22, 28), pf=(28, 0), jf=(24, 28), qd=(0, 52), pc=(2, 90), cb=(4, 110),
                   ct=(-10, 72), mt=(-4, 58), cf=(18, 104), mf=(26, 128)),
+    # (a investida CORRENDO de verdade: as pernas trocando — pedido do Gomes)
+    "t_investida2": dict(pt=(20, 4), jt=(26, 26), pf=(-30, 4), jf=(-18, 26), qd=(0, 44), pc=(24, 76), cb=(36, 90),
+                         ct=(30, 70), mt=(52, 74), cf=(38, 72), mf=(58, 76)),
 }
 proporcionar(POSES_TAI)
 
@@ -128,6 +131,16 @@ def tapas_quadros():
 # SHIFT: INVESTIDA — empurra até a parede
 # =====================================================================
 I_INI, I_CORRE, I_EMPURRA = 8, 26, 100  # (empurra até a parede: dá tempo de atravessar a tela)
+
+
+def investida_quadros():
+    """A investida CORRENDO: as pernas trocando a cada passo (até a parede)."""
+    q = [(0, "parado"), (I_INI - 2, "t_investida")]
+    t, k = I_INI + 3, 0
+    while t < 60:
+        q.append((t, "t_investida2" if k % 2 == 0 else "t_investida"))
+        t, k = t + 5, k + 1
+    return q + [(60, q[-1][1]), (70, "parado")]
 
 
 def investida(l, outro, jogo):
@@ -275,7 +288,7 @@ _registra("tai_tapas", ini=T_INI, ativo=T_HITS * T_INTERVALO, rec=12,
           quadros=tapas_quadros())
 _registra("tai_investida", ini=I_INI, ativo=I_CORRE - I_INI, rec=16, janelas=((I_INI, I_CORRE),),
           caixa=(0, 20, 64, 120), dano=12, hit=24, defe=12, emp=2, nivel="medio", logica=investida, ia="medio",
-          som="vento", quadros=[(0, "parado"), (I_INI - 2, "t_investida"), (60, "t_investida"), (70, "parado")])
+          som="vento", quadros=investida_quadros())
 GOLPES["tai_investida"]["total"] = 9999
 _registra("tai_ultimate", ini=U_PEGA, ativo=6, rec=0, janelas=((U_PEGA, U_PEGA + 6),), caixa=(10, 30, 66, 110),
           dano=0, hit=60, defe=0, emp=0, nivel="medio", ultimate=True, logica=ultimate,  # (agora DÁ PRA DEFENDER)
